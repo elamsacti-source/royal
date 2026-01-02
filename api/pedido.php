@@ -1,4 +1,6 @@
 <?php
+// royal/api/pedido.php
+session_start(); // INICIAMOS SESIÓN PARA DETECTAR AL USUARIO
 header('Content-Type: application/json');
 header("Access-Control-Allow-Origin: *");
 require_once '../config/db.php';
@@ -15,15 +17,29 @@ $lat     = $cliente['lat'] ?? null;
 $lon     = $cliente['lon'] ?? null;
 $id_sede = 2; // Sede principal
 
+// DETECTAR ID DE USUARIO LOGUEADO
+$id_usuario_registrado = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+
 try {
     $pdo->beginTransaction();
 
-    // 1. Crear Venta
+    // 1. Crear Venta (AHORA GUARDAMOS id_cliente)
     $sqlVenta = "INSERT INTO ventas (total, metodo_pago, fecha, tipo_venta, estado_delivery, 
-                 nombre_contacto, telefono_contacto, direccion_entrega, latitud, longitud) 
-                 VALUES (?, ?, NOW(), 'delivery', 'pendiente', ?, ?, ?, ?, ?)";
+                 nombre_contacto, telefono_contacto, direccion_entrega, latitud, longitud, id_cliente) 
+                 VALUES (?, ?, NOW(), 'delivery', 'pendiente', ?, ?, ?, ?, ?, ?)";
+                 
     $stmt = $pdo->prepare($sqlVenta);
-    $stmt->execute([$total, $metodo, $cliente['nombre'], $cliente['telefono'], $cliente['direccion'], $lat, $lon]);
+    $stmt->execute([
+        $total, 
+        $metodo, 
+        $cliente['nombre'], 
+        $cliente['telefono'], 
+        $cliente['direccion'], 
+        $lat, 
+        $lon,
+        $id_usuario_registrado // Guardamos el ID
+    ]);
+    
     $id_venta = $pdo->lastInsertId();
 
     // 2. Insertar Detalles y DESCONTAR STOCK
