@@ -15,11 +15,12 @@ $id_sede = $usuario_data['id_sede'] ?? 2;
 $action = $_GET['action'] ?? '';
 
 // ============================================================================
-// 1. LISTAR CON CÁLCULO DE STOCK VIRTUAL PARA COMBOS
+// 1. LISTAR CON CÁLCULO DE STOCK VIRTUAL PARA COMBOS Y DATOS DE CAJA
 // ============================================================================
 if ($action == 'listar') {
-    // Traemos productos y su stock FÍSICO en esta sede
-    $sql = "SELECT p.id, p.codigo_barras, p.nombre, p.categoria, p.precio_venta, p.es_combo,
+    // MODIFICADO: Agregamos precio_caja y unidades_caja a la consulta
+    $sql = "SELECT p.id, p.codigo_barras, p.nombre, p.categoria, p.precio_venta, 
+            p.precio_caja, p.unidades_caja, p.es_combo,
             COALESCE(ps.stock, 0) as stock_actual
             FROM productos p
             LEFT JOIN productos_sedes ps ON p.id = ps.id_producto AND ps.id_sede = ?
@@ -34,7 +35,6 @@ if ($action == 'listar') {
         
         // --- LÓGICA DE CÁLCULO DE STOCK PARA PACKS ---
         if ($prod['es_combo'] == 1) {
-            // 1. Obtener ingredientes y sus cantidades necesarias
             $sqlDet = "SELECT p.nombre, cd.cantidad, cd.id_producto 
                        FROM combos_detalle cd 
                        JOIN productos p ON cd.id_producto = p.id 
@@ -44,20 +44,15 @@ if ($action == 'listar') {
             $ingredientes = $stmtDet->fetchAll();
 
             $textos = [];
-            $maximos_posibles = []; // Aquí guardaremos cuánto podemos hacer con cada ingrediente
+            $maximos_posibles = []; 
 
             foreach ($ingredientes as $ing) {
-                // Texto para el ticket
                 $textos[] = $ing['cantidad'] . " " . $ing['nombre'];
                 
-                // Consultar stock de este ingrediente en la sede actual
                 $stmtStockIng = $pdo->prepare("SELECT stock FROM productos_sedes WHERE id_producto = ? AND id_sede = ?");
                 $stmtStockIng->execute([$ing['id_producto'], $id_sede]);
                 $stock_insumo = $stmtStockIng->fetchColumn() ?: 0;
                 
-                // Calcular cuántos packs alcanzan con este insumo
-                // Ej: Tengo 10 Rones y el pack pide 1 => alcanzan 10
-                // Ej: Tengo 50 hielos y el pack pide 2 => alcanzan 25
                 if ($ing['cantidad'] > 0) {
                     $alcanza_para = floor($stock_insumo / $ing['cantidad']);
                     $maximos_posibles[] = $alcanza_para;
@@ -66,12 +61,10 @@ if ($action == 'listar') {
                 }
             }
 
-            // El stock del pack es el MÍNIMO de lo que permiten sus ingredientes
-            // Si alcanzan 10 rones pero solo 2 cocas, solo puedo vender 2 packs.
             if (count($maximos_posibles) > 0) {
                 $prod['stock_actual'] = min($maximos_posibles);
             } else {
-                $prod['stock_actual'] = 0; // Pack sin receta no se vende
+                $prod['stock_actual'] = 0; 
             }
 
             if(count($textos) > 0) $prod['descripcion_combo'] = "(" . implode(" + ", $textos) . ")";
@@ -108,10 +101,8 @@ if ($action == 'procesar') {
         foreach ($items as $item) {
             $id_prod = $item['id'];
             $cant = $item['cantidad'];
+            $modo = $item['modo'] ?? 'unidad'; // MODIFICADO: Recibimos el modo (caja/unidad)
             
-            // Validar Stock nuevamente antes de restar (Seguridad extra)
-            // (Omitido por brevedad, pero idealmente se recalcula aquí)
-
             $sqlDet = "INSERT INTO ventas_detalle (id_venta, id_producto, cantidad, precio_historico, subtotal) VALUES (?, ?, ?, ?, ?)";
             $pdo->prepare($sqlDet)->execute([$id_venta, $id_prod, $cant, $item['precio'], $item['precio']*$cant]);
 
@@ -124,7 +115,23 @@ if ($action == 'procesar') {
                     descontarStockSede($pdo, $insumo['id_producto'], $id_sede, $insumo['cantidad'] * $cant, "Venta Pack #$id_venta");
                 }
             } else {
-                descontarStockSede($pdo, $id_prod, $id_sede, $cant, "Venta #$id_venta");
+                // MODIFICADO: Lógica para descontar Cajas vs Unidades
+                $cantidad_a_descontar = $cant;
+                $nota_kardex = "Venta #$id_venta";
+
+                if ($modo === 'caja') {
+                    // Consultamos el factor de conversión real de la BD por seguridad
+                    $stmtFactor = $pdo->prepare("SELECT unidades_caja FROM productos WHERE id = ?");
+                    $stmtFactor->execute([$id_prod]);
+                    $factor = $stmtFactor->fetchColumn() ?: 1;
+                    
+                    $cantidad_a_descontar = $cant * $factor;
+                    $nota_kardex .= " ($cant Cajas x $factor)";
+                } else {
+                    // Modo unidad normal
+                }
+
+                descontarStockSede($pdo, $id_prod, $id_sede, $cantidad_a_descontar, $nota_kardex);
             }
         }
 
@@ -149,9 +156,8 @@ function descontarStockSede($pdo, $id_prod, $id_sede, $cantidad, $nota) {
     $sqlUpd = "UPDATE productos_sedes SET stock = stock - ? WHERE id_producto = ? AND id_sede = ?";
     $pdo->prepare($sqlUpd)->execute([$cantidad, $id_prod, $id_sede]);
 
-    // Kardex (Simplificado, idealmente usar columna id_sede si la agregaste al kardex)
-    // Usamos el campo nota para indicar la sede por ahora si no actualizaste la tabla kardex
-    $sqlK = "INSERT INTO kardex (id_producto, tipo_movimiento, cantidad, stock_resultante, nota, fecha) VALUES (?, 'venta', ?, 0, ?, NOW())";
-    $pdo->prepare($sqlK)->execute([$id_prod, -$cantidad, $nota . " (Sede $id_sede)"]);
+    // Kardex
+    $sqlK = "INSERT INTO kardex (id_producto, id_sede, tipo_movimiento, cantidad, stock_resultante, nota, fecha) VALUES (?, ?, 'venta', ?, 0, ?, NOW())";
+    $pdo->prepare($sqlK)->execute([$id_prod, $id_sede, -$cantidad, $nota]);
 }
 ?>

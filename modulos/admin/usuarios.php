@@ -25,8 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['accion']) && $_POST['a
         if ($check->fetch()) {
             $mensaje = "<div class='alert alert-error'>⚠️ El usuario '$usuario' ya existe.</div>";
         } else {
-            // Insertar nuevo usuario (Nota: Para este ejemplo usamos texto plano como en tu login actual. 
-            // Lo ideal sería usar password_hash() en el futuro).
+            // Insertar nuevo usuario
             $sql = "INSERT INTO usuarios (nombre, usuario, password, rol, id_sede, activo) VALUES (?, ?, ?, ?, ?, 1)";
             $stmt = $pdo->prepare($sql);
             if ($stmt->execute([$nombre, $usuario, $password, $rol, $id_sede])) {
@@ -100,6 +99,7 @@ $usuarios = $pdo->query($sqlUsers)->fetchAll();
                 <select name="rol" class="form-control">
                     <option value="cajero">Cajero (Ventas)</option>
                     <option value="admin">Administrador (Total)</option>
+                    <option value="driver">Driver (Repartidor)</option>
                 </select>
             </div>
 
@@ -140,6 +140,8 @@ $usuarios = $pdo->query($sqlUsers)->fetchAll();
                     <td>
                         <?php if($u['rol'] == 'admin'): ?>
                             <span class="badge" style="background:#FFD700; color:#000; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">ADMIN</span>
+                        <?php elseif($u['rol'] == 'driver'): ?>
+                             <span class="badge" style="background:#29b6f6; color:#000; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">DRIVER</span>
                         <?php else: ?>
                             <span class="badge" style="background:#333; color:#fff; padding:2px 8px; border-radius:4px; font-size:0.8rem;">CAJERO</span>
                         <?php endif; ?>

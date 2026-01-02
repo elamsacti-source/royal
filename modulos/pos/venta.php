@@ -52,7 +52,6 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 
         .left-header { flex: 0 0 auto; margin-bottom: 10px; }
 
-        /* Categorías con scroll horizontal oculto */
         .category-bar {
             display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 10px; flex: 0 0 auto;
             scrollbar-width: none; 
@@ -69,7 +68,6 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
             box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
         }
 
-        /* Grid de Productos (ÁREA CON SCROLL) */
         .product-list-container {
             flex: 1; overflow-y: auto; padding-right: 5px;
         }
@@ -99,7 +97,6 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 
         .ticket-header { flex: 0 0 auto; padding: 15px; background: #000; border-bottom: 1px solid #222; text-align: center; }
         
-        /* Lista del Ticket (SCROLLABLE) */
         .ticket-body { flex: 1; overflow-y: auto; padding: 10px; }
         .ticket-body::-webkit-scrollbar { width: 5px; }
         .ticket-body::-webkit-scrollbar-thumb { background: #333; }
@@ -108,10 +105,36 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 
         .ticket-item { 
             background: #1a1a1a; margin-bottom: 8px; padding: 10px; border-radius: 8px; border-left: 3px solid var(--royal-gold);
-            display: flex; justify-content: space-between; align-items: center; 
+            display: flex; justify-content: space-between; align-items: flex-start; 
         }
 
+        /* --- ESTILOS PARA INPUTS EN CARRITO --- */
+        .cart-controls { display: flex; gap: 5px; margin-top: 8px; align-items: center; }
+        .cart-qty-input {
+            width: 50px; background: #222; border: 1px solid #444; color: #fff;
+            text-align: center; padding: 5px; border-radius: 4px; font-weight: bold;
+            font-size: 1rem;
+        }
+        .cart-mode-select {
+            background: #222; border: 1px solid #444; color: var(--royal-gold);
+            padding: 5px; border-radius: 4px; font-size: 0.85rem; width: auto; font-weight: bold;
+        }
+        .cart-mode-select:focus, .cart-qty-input:focus { outline: none; border-color: var(--royal-gold); }
+
         .mobile-cart-btn { display: none; }
+
+        /* --- ESTILOS DEL BOTÓN DE NOTIFICACIÓN DELIVERY --- */
+        #btn-delivery-notify {
+            background: #333; color: #888; border: 1px solid #555; 
+            padding: 8px 15px; border-radius: 5px; text-decoration: none; 
+            font-size: 0.9rem; display: flex; align-items: center; gap: 8px;
+            transition: 0.3s; margin-right: 10px;
+        }
+        #btn-delivery-notify.activo {
+            background: #ef5350; color: #fff; border-color: #ef5350;
+            animation: latido 0.8s infinite; /* Latido más rápido */
+        }
+        @keyframes latido { 0% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 15px #ef5350; } 100% { transform: scale(1); } }
 
         /* =========================================
            ESTILOS IMPRESIÓN (TM-U220)
@@ -183,9 +206,16 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         <div class="left-header">
             <div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center;">
                 <h3 style="color:var(--royal-gold); margin:0; font-size:1.2rem;">ROYAL POS</h3>
-                <a href="../../logout.php" style="color:#ef5350; text-decoration:none; font-size:0.9rem; border:1px solid #ef5350; padding:4px 10px; border-radius:5px;">
-                    <i class="fa-solid fa-power-off"></i> Salir
-                </a>
+                
+                <div style="display:flex; align-items:center;">
+                    <a href="delivery.php" id="btn-delivery-notify">
+                        <i class="fa-solid fa-motorcycle"></i> <span id="delivery-count">0</span>
+                    </a>
+
+                    <a href="../../logout.php" style="color:#ef5350; text-decoration:none; font-size:0.9rem; border:1px solid #ef5350; padding:4px 10px; border-radius:5px;">
+                        <i class="fa-solid fa-power-off"></i> Salir
+                    </a>
+                </div>
             </div>
             
             <div style="display:flex; gap:10px; margin-bottom:10px;">
@@ -250,12 +280,74 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
 <script>
+    // --- LÓGICA DE NOTIFICACIÓN DELIVERY (MEJORADA) ---
+    let lastCount = 0;
+
+    function checkPedidos() {
+        fetch('../../api/check_pedidos.php')
+            .then(r => r.json())
+            .then(data => {
+                const btn = document.getElementById('btn-delivery-notify');
+                const span = document.getElementById('delivery-count');
+                const count = parseInt(data.pendientes);
+
+                span.innerText = count;
+
+                if (count > 0) {
+                    btn.classList.add('activo');
+                    btn.innerHTML = `<i class="fa-solid fa-motorcycle"></i> ${count} PEDIDOS WEB`;
+                    
+                    // Solo si hay MÁS pedidos que la última vez, activamos la alerta de voz
+                    if (count > lastCount) {
+                        reproducirVoz();
+                    }
+                } else {
+                    btn.classList.remove('activo');
+                    btn.innerHTML = `<i class="fa-solid fa-motorcycle"></i> 0`;
+                }
+                lastCount = count;
+            })
+            .catch(err => console.log('Esperando API delivery...'));
+    }
+
+    function reproducirVoz() {
+        // Verificar soporte del navegador
+        if ('speechSynthesis' in window) {
+            // Cancelar cola anterior por si acaso
+            window.speechSynthesis.cancel();
+
+            let frase = "¡Atención! ¡Nuevo pedido de Delivery! Por favor, revise la tablet.";
+            let mensaje = new SpeechSynthesisUtterance(frase);
+            
+            // Configuración para que sea más "Alerta"
+            mensaje.lang = 'es-ES';
+            mensaje.rate = 1.1; // Un poco rápido
+            mensaje.pitch = 1.1; // Tono ligeramente agudo
+            mensaje.volume = 1;
+
+            // ENCOLAR 3 VECES PARA QUE SEA INSISTENTE
+            window.speechSynthesis.speak(mensaje);
+            window.speechSynthesis.speak(mensaje);
+            window.speechSynthesis.speak(mensaje);
+        } else {
+            // Fallback para navegadores antiguos: Beep repetido
+            let audio = new Audio('../../assets/beep.mp3'); 
+            audio.play();
+            setTimeout(() => audio.play(), 1500);
+            setTimeout(() => audio.play(), 3000);
+        }
+    }
+
+    // Iniciar chequeo cada 10 segundos
+    setInterval(checkPedidos, 10000);
+    
+    // --- LÓGICA DEL POS (Cajas, Carrito, etc.) ---
     let carrito = [];
     let productos = [];
     let categorias = new Set();
     let scanner;
 
-    // 1. CARGA DE DATOS
+    // 1. CARGA DE DATOS E INICIO DE POLLING
     fetch('backend_venta.php?action=listar')
         .then(res => res.json())
         .then(data => {
@@ -271,6 +363,9 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
                 catDiv.appendChild(btn);
             });
             renderProductos(data);
+            
+            // Revisar pedidos al cargar
+            checkPedidos();
         });
 
     function filtrarCategoria(cat, btn) {
@@ -307,7 +402,6 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
                 stockHtml = `<small style="color:#66bb6a;">Disp: ${p.stock_actual}</small>`;
             }
             
-            // MONEDA PERUANA EN CARDS
             div.innerHTML += `
             <div class="product-card ${claseExtra}" style="opacity:${opacity}; cursor:${cursor};" onclick="agregar(${p.id})">
                 ${packIcon}
@@ -321,11 +415,10 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         });
     }
 
-    // 2. AGREGAR AL CARRITO (CON VALIDACIÓN ESTRICTA)
+    // 2. AGREGAR AL CARRITO (CON LÓGICA DE PRECIOS Y MODOS)
     function agregar(id) {
         const p = productos.find(x => x.id == id);
         
-        // BLOQUEO TOTAL SI STOCK ES 0
         if(p.stock_actual <= 0) {
             let msg = (p.es_combo == 1) ? '⚠️ Faltan insumos para este Pack.' : '⚠️ Producto agotado.';
             return alert(msg);
@@ -333,17 +426,41 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         
         const item = carrito.find(x => x.id == id);
         if(item) {
-            if(item.cant + 1 > p.stock_actual) {
-                return alert("⚠️ Stock insuficiente. Solo quedan " + p.stock_actual);
-            }
-            item.cant++;
+            // Si ya existe, sumamos 1, validando stock
+            validarYActualizarCantidad(item, item.cant + 1);
         } else {
+            // Nuevo item con datos extendidos
             carrito.push({
-                id: p.id, nombre: p.nombre, precio_venta: parseFloat(p.precio_venta), 
-                cant: 1, es_combo: p.es_combo, descripcion_combo: p.descripcion_combo, categoria: p.categoria
+                id: p.id, 
+                nombre: p.nombre, 
+                precio_unitario: parseFloat(p.precio_venta),      
+                precio_caja: parseFloat(p.precio_caja || 0),      
+                unidades_caja: parseInt(p.unidades_caja || 1),    
+                precio_aplicado: parseFloat(p.precio_venta),      
+                cant: 1, 
+                modo: 'unidad', // 'unidad' o 'caja'
+                es_combo: p.es_combo, 
+                descripcion_combo: p.descripcion_combo, 
+                stock_max: p.stock_actual 
             });
         }
         actualizarCarrito();
+    }
+
+    function validarYActualizarCantidad(item, nuevaCant) {
+        let descuentoTotal = nuevaCant;
+        
+        if (item.modo === 'caja') {
+            descuentoTotal = nuevaCant * item.unidades_caja;
+        }
+
+        if (descuentoTotal > item.stock_max) {
+            // Opcional: Permitir venta negativa quitando este if, pero lo mantenemos por seguridad
+            alert(`⚠️ Stock insuficiente. Tienes ${item.stock_max} unidades, intentas llevar ${descuentoTotal} (equivalente).`);
+            return; 
+        }
+        
+        item.cant = nuevaCant;
     }
 
     function actualizarCarrito() {
@@ -351,27 +468,77 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         div.innerHTML = '';
         let total = 0;
         
+        // Usamos slice y reverse para mostrar los ultimos arriba, 
+        // pero necesitamos el indice real para eliminar/editar
         carrito.slice().reverse().forEach((p, idx) => {
-            total += p.precio_venta * p.cant;
-            // MONEDA PERUANA EN LISTA DE CARRITO
+            const realIdx = carrito.length - 1 - idx;
+            const subtotal = p.precio_aplicado * p.cant;
+            total += subtotal;
+
+            // Generar selector si el producto tiene opción de caja
+            let selectorModo = '';
+            if (p.unidades_caja > 1 && p.es_combo == 0) {
+                selectorModo = `
+                <select class="cart-mode-select" onchange="cambiarModo(${realIdx}, this.value)">
+                    <option value="unidad" ${p.modo === 'unidad' ? 'selected' : ''}>Unid.</option>
+                    <option value="caja" ${p.modo === 'caja' ? 'selected' : ''}>Caja x${p.unidades_caja}</option>
+                </select>`;
+            }
+
             div.innerHTML += `
             <div class="ticket-item">
-                <div>
-                    <div style="color:#fff; font-size:0.9rem;">${p.nombre}</div>
-                    <small style="color:#888;">S/ ${p.precio_venta.toFixed(2)} x ${p.cant}</small>
+                <div style="flex:1;">
+                    <div style="color:#fff; font-size:0.9rem; margin-bottom:4px;">${p.nombre}</div>
+                    
+                    <div class="cart-controls">
+                        <input type="number" class="cart-qty-input" value="${p.cant}" min="1" 
+                               onchange="cambiarCantidad(${realIdx}, this.value)">
+                        
+                        ${selectorModo}
+                    </div>
                 </div>
+                
                 <div style="text-align:right;">
-                    <div style="color:var(--royal-gold); font-weight:bold;">S/ ${(p.precio_venta * p.cant).toFixed(2)}</div>
-                    <i class="fa-solid fa-trash" onclick="eliminar(${carrito.length - 1 - idx})" style="color:#ef5350; cursor:pointer;"></i>
+                    <div style="color:var(--royal-gold); font-weight:bold;">S/ ${subtotal.toFixed(2)}</div>
+                    <small style="color:#666;">PU: ${p.precio_aplicado.toFixed(2)}</small>
+                    <br>
+                    <i class="fa-solid fa-trash" onclick="eliminar(${realIdx})" style="color:#ef5350; cursor:pointer; margin-top:8px;"></i>
                 </div>
             </div>`;
         });
         
-        // MONEDA PERUANA EN TOTAL GLOBAL
         const txtTotal = 'S/ ' + total.toFixed(2);
         document.getElementById('total-amount').innerText = txtTotal;
         document.getElementById('mobile-total').innerText = txtTotal;
         document.getElementById('modal-total-amount').innerText = txtTotal;
+    }
+
+    function cambiarCantidad(idx, val) {
+        const nuevaCant = parseFloat(val);
+        if (nuevaCant > 0) {
+            validarYActualizarCantidad(carrito[idx], nuevaCant);
+        }
+        actualizarCarrito(); 
+    }
+
+    function cambiarModo(idx, nuevoModo) {
+        const item = carrito[idx];
+        item.modo = nuevoModo;
+
+        if (nuevoModo === 'caja') {
+            if (item.precio_caja > 0) {
+                item.precio_aplicado = item.precio_caja;
+            } else {
+                // Si no configuraron precio caja, calculamos x cantidad
+                item.precio_aplicado = item.precio_unitario * item.unidades_caja;
+            }
+        } else {
+            item.precio_aplicado = item.precio_unitario;
+        }
+        
+        // Validar de nuevo el stock al cambiar de modo
+        validarYActualizarCantidad(item, item.cant);
+        actualizarCarrito();
     }
 
     function eliminar(idx) { carrito.splice(idx, 1); actualizarCarrito(); }
@@ -384,10 +551,8 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
     }
 
     function procesarPago(metodo) {
-        // AQUI ESTA LA MAGIA: Quitamos "S/" y espacios antes de enviar
         let totalStr = document.getElementById('total-amount').innerText;
         totalStr = totalStr.replace('S/', '').trim(); 
-        
         const total = totalStr;
 
         document.getElementById('payment-modal').innerHTML = '<h2 style="color:#fff;">Procesando...</h2>';
@@ -395,7 +560,13 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         fetch('backend_venta.php?action=procesar', {
             method: 'POST', 
             body: JSON.stringify({ 
-                items: carrito.map(i => ({ id: i.id, cantidad: i.cant, precio: i.precio_venta, es_combo: i.es_combo })), 
+                items: carrito.map(i => ({ 
+                    id: i.id, 
+                    cantidad: i.cant, 
+                    precio: i.precio_aplicado, 
+                    es_combo: i.es_combo,
+                    modo: i.modo 
+                })), 
                 total: total,
                 metodo_pago: metodo
             })
@@ -406,12 +577,18 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
                 // Imprimir Ticket
                 document.getElementById('print-id-venta').innerText = data.id_venta;
                 document.getElementById('print-metodo').innerText = "PAGO: " + metodo.toUpperCase();
-                // MONEDA PERUANA EN IMPRESION
                 document.getElementById('print-total').innerText = 'S/ ' + total;
                 let html = '';
                 carrito.forEach(i => {
                     let nom = i.nombre.length > 16 ? i.nombre.substring(0,16) : i.nombre;
-                    html += `<div class="t-row"><div class="col-prod">${nom}</div><div class="col-cant">${i.cant}</div><div class="col-total">${(i.precio_venta*i.cant).toFixed(2)}</div></div>`;
+                    // Mostrar si es Caja en el ticket
+                    let labelModo = (i.modo === 'caja') ? ' (CJ)' : '';
+                    
+                    html += `<div class="t-row">
+                                <div class="col-prod">${nom}${labelModo}</div>
+                                <div class="col-cant">${i.cant}</div>
+                                <div class="col-total">${(i.precio_aplicado*i.cant).toFixed(2)}</div>
+                             </div>`;
                     if(i.es_combo==1 && i.descripcion_combo) html += `<div class="t-detail">${i.descripcion_combo.substring(0,30)}</div>`;
                 });
                 document.getElementById('print-items').innerHTML = html;

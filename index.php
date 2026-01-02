@@ -13,17 +13,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->execute([$usuario]);
     $user = $stmt->fetch();
 
-    // COMPARACIÓN DIRECTA (Sin Hash)
+    // COMPARACIÓN DIRECTA
     if ($user && $password == $user['password']) {
         // Login Exitoso
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['nombre'] = $user['nombre'];
         $_SESSION['rol'] = $user['rol'];
 
-        // Redirección
+        // --- AQUÍ ESTÁ LA CORRECCIÓN DE REDIRECCIÓN ---
         if ($user['rol'] == 'admin') {
             header("Location: modulos/admin/dashboard.php");
+        } elseif ($user['rol'] == 'driver') {
+            // Si es driver, lo mandamos a SU carpeta
+            header("Location: modulos/driver/index.php");
         } else {
+            // Por defecto (Cajero o cualquier otro) va al POS
             header("Location: modulos/pos/abrir_caja.php");
         }
         exit;
@@ -70,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <form method="POST">
         <div style="text-align:left; margin-bottom:5px; color:#888;">Usuario</div>
-        <input type="text" name="usuario" required placeholder="admin" autofocus>
+        <input type="text" name="usuario" required placeholder="Usuario" autofocus>
 
         <div style="text-align:left; margin-bottom:5px; color:#888;">Contraseña</div>
         <input type="password" name="password" required placeholder="••••••">

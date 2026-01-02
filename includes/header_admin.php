@@ -1,4 +1,6 @@
 <?php
+// royal/includes/header_admin.php
+
 // 1. INICIO DE SESIÓN Y SEGURIDAD
 // Evitar conflicto si la sesión ya fue iniciada en otro archivo
 if (session_status() === PHP_SESSION_NONE) {
@@ -7,7 +9,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Verificar si el usuario está logueado
 if (!isset($_SESSION['user_id'])) {
-    // Si no hay sesión, redireccionar al login (ajusta la ruta si es necesario)
+    // Si no hay sesión, redireccionar al login
     header("Location: ../../index.php");
     exit;
 }
@@ -50,6 +52,10 @@ if (!isset($_SESSION['user_id'])) {
             <i class="fa-solid fa-chart-pie"></i> Dashboard
         </a>
         
+        <a href="pedidos_delivery.php" style="color:#66bb6a; border-left-color: #66bb6a;">
+            <i class="fa-solid fa-motorcycle"></i> Pedidos Delivery
+        </a>
+        
         <a href="productos_nuevo.php">
             <i class="fa-solid fa-plus-circle"></i> Nuevo Producto
         </a>
@@ -78,6 +84,10 @@ if (!isset($_SESSION['user_id'])) {
             <i class="fa-solid fa-list-check"></i> Reporte Kardex
         </a>
         
+        <a href="historial_ventas.php">
+            <i class="fa-solid fa-clock-rotate-left"></i> Historial Ventas
+        </a>
+        
         <br>
         
         <a href="../../logout.php" style="color: #ef5350; border: 1px solid #ef5350; margin-top:auto;">
@@ -98,14 +108,20 @@ if (!isset($_SESSION['user_id'])) {
     }
 
     // Script para resaltar automáticamente la página actual en el menú
-    // Ajustado para comparar solo el nombre del archivo final
     const currentPath = window.location.pathname.split("/").pop();
     document.querySelectorAll('.menu a').forEach(link => {
         const linkPath = link.getAttribute('href');
+        // Si el enlace coincide con el archivo actual, lo pintamos de activo
         if(linkPath === currentPath) {
             link.style.background = '#1a1a1a';
             link.style.color = '#fff';
-            link.style.borderLeft = '4px solid var(--royal-gold)';
+            
+            // Mantenemos el color verde para delivery, dorado para el resto
+            if(linkPath === 'pedidos_delivery.php') {
+                link.style.borderLeft = '4px solid #66bb6a';
+            } else {
+                link.style.borderLeft = '4px solid var(--royal-gold)';
+            }
         }
     });
 </script>
