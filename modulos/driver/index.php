@@ -38,10 +38,9 @@ if (isset($_POST['accion'])) {
         }
     }
 
-    // --- NUEVO: LIBERAR PEDIDO (CANCELAR COMO DRIVER) ---
+    // LIBERAR PEDIDO (CANCELAR COMO DRIVER)
     if ($_POST['accion'] == 'liberar') {
         // Regresa el pedido a estado 'confirmado' y quita al driver (id_driver = NULL)
-        // Así otro compañero puede tomarlo.
         $stmt = $pdo->prepare("UPDATE ventas SET id_driver = NULL, estado_delivery = 'confirmado' WHERE id = ? AND id_driver = ?");
         if ($stmt->execute([$id_venta, $id_driver])) {
             header("Location: index.php"); exit;
@@ -50,8 +49,8 @@ if (isset($_POST['accion'])) {
 }
 
 // 3. CONSULTAS
-// Pedido en curso del driver actual
-$stmt = $pdo->prepare("SELECT * FROM ventas WHERE id_driver = ? AND estado_delivery = 'en_camino'");
+// CORRECCIÓN PRINCIPAL: Busca pedidos asignados a mí, incluso si el estado se regresó a 'confirmado' por error.
+$stmt = $pdo->prepare("SELECT * FROM ventas WHERE id_driver = ? AND estado_delivery IN ('en_camino', 'confirmado')");
 $stmt->execute([$id_driver]);
 $mis_pedidos = $stmt->fetchAll();
 
@@ -114,8 +113,6 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
         .btn-action { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: 800; font-size: 1rem; text-transform: uppercase; cursor: pointer; margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 10px; }
         .btn-gold { background: #FFD700; color: #000; }
         .btn-green { background: #66bb6a; color: #000; }
-        
-        /* Estilo Botón Cancelar/Liberar */
         .btn-cancel { background: #2a0a0a; color: #ef5350; border: 1px solid #ef5350; font-size: 0.9rem; padding: 12px; margin-top: 15px; }
         
         .btn-link { display: block; width: 100%; text-align: center; padding: 12px; background: #000; color: #4fc3f7; text-decoration: none; font-weight: bold; border: 1px solid #4fc3f7; border-radius: 8px; margin-top: 10px; }
@@ -172,13 +169,10 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
                             <?= $p['direccion_entrega'] ?>
                             
                             <?php 
-                                // Si tenemos latitud/longitud, usamos navegación directa por coordenadas
                                 if (!empty($p['latitud']) && !empty($p['longitud'])) {
-                                    // navigate=yes obliga a navegar desde la ubicación actual
                                     $wazeUrl = "https://waze.com/ul?ll={$p['latitud']},{$p['longitud']}&navigate=yes";
                                     $textoWaze = "NAVEGAR CON GPS (AUTOMÁTICO)";
                                 } else {
-                                    // Fallback: Si no hay coordenadas, busca por dirección escrita
                                     $wazeUrl = "https://waze.com/ul?q=" . urlencode($p['direccion_entrega']) . "&navigate=yes";
                                     $textoWaze = "BUSCAR EN WAZE";
                                 }
@@ -211,7 +205,6 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
                     </form>
 
                     <script>
-                        // Envia ubicación cada 10 segs
                         setInterval(() => {
                             if(navigator.geolocation) {
                                 navigator.geolocation.getCurrentPosition(pos => {
@@ -271,7 +264,6 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
     </div>
 
     <script>
-        // Auto-refresh para ver si caen nuevos pedidos (Solo si no tengo uno activo)
         setTimeout(() => { 
             if(!document.querySelector('.order-card.active')) location.reload(); 
         }, 15000);

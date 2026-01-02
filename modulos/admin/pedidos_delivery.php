@@ -8,7 +8,8 @@ if (isset($_POST['accion'])) {
     $id_venta = $_POST['id_venta'];
     
     if ($_POST['accion'] == 'confirmar') {
-        $stmt = $pdo->prepare("UPDATE ventas SET estado_delivery = 'confirmado' WHERE id = ?");
+        // CORRECCIÓN BLINDAJE: Solo confirmar si sigue pendiente. Si ya está en camino, no lo tocamos.
+        $stmt = $pdo->prepare("UPDATE ventas SET estado_delivery = 'confirmado' WHERE id = ? AND estado_delivery = 'pendiente'");
         $stmt->execute([$id_venta]);
     }
     if ($_POST['accion'] == 'cancelar') {
@@ -16,7 +17,6 @@ if (isset($_POST['accion'])) {
         $stmt->execute([$id_venta]);
     }
     if ($_POST['accion'] == 'marcar_pagado') {
-        // Útil si pagan con Yape y quieres validar
         $stmt = $pdo->prepare("UPDATE ventas SET metodo_pago = CONCAT(metodo_pago, ' (Verificado)') WHERE id = ?");
         $stmt->execute([$id_venta]);
     }
@@ -69,7 +69,6 @@ foreach($pedidos as $p) { if($p['estado_delivery']=='pendiente') $hay_pendientes
                 
                 <div style="background:#000; padding:10px; border-radius:5px; margin-bottom:10px; font-size:0.9rem; max-height:100px; overflow-y:auto;">
                     <?php
-                        // Traer productos de este pedido
                         $stmtDet = $pdo->prepare("SELECT d.cantidad, p.nombre FROM ventas_detalle d JOIN productos p ON d.id_producto = p.id WHERE d.id_venta = ?");
                         $stmtDet->execute([$p['id']]);
                         $items = $stmtDet->fetchAll();
@@ -121,12 +120,10 @@ foreach($pedidos as $p) { if($p['estado_delivery']=='pendiente') $hay_pendientes
 <audio id="alerta-nueva" src="../../assets/notification.mp3"></audio>
 
 <script>
-    // Recargar cada 10 segundos
     setTimeout(() => {
         location.reload();
     }, 10000);
 
-    // Reproducir sonido si PHP detectó pendientes
     <?php if($hay_pendientes): ?>
         window.onload = function() {
             let audio = document.getElementById('alerta-nueva');
