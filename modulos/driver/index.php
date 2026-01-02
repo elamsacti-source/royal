@@ -17,14 +17,16 @@ if (isset($_POST['accion'])) {
     
     // ACEPTAR PEDIDO
     if ($_POST['accion'] == 'aceptar') {
+        // Verificamos que siga libre
         $check = $pdo->prepare("SELECT id FROM ventas WHERE id = ? AND id_driver IS NULL");
         $check->execute([$id_venta]);
         if ($check->fetch()) {
             $stmt = $pdo->prepare("UPDATE ventas SET id_driver = ?, estado_delivery = 'en_camino' WHERE id = ?");
             $stmt->execute([$id_driver, $id_venta]);
+            // Recargar para evitar reenvío de formulario
             header("Location: index.php"); exit;
         } else {
-            $mensaje = "<div class='alerta error'>⚠️ Otro driver ganó el pedido.</div>";
+            $mensaje = "<div class='alerta error'>⚠️ El pedido ya fue tomado por otro driver.</div>";
         }
     }
 
@@ -35,13 +37,25 @@ if (isset($_POST['accion'])) {
             header("Location: index.php"); exit;
         }
     }
+
+    // --- NUEVO: LIBERAR PEDIDO (CANCELAR COMO DRIVER) ---
+    if ($_POST['accion'] == 'liberar') {
+        // Regresa el pedido a estado 'confirmado' y quita al driver (id_driver = NULL)
+        // Así otro compañero puede tomarlo.
+        $stmt = $pdo->prepare("UPDATE ventas SET id_driver = NULL, estado_delivery = 'confirmado' WHERE id = ? AND id_driver = ?");
+        if ($stmt->execute([$id_venta, $id_driver])) {
+            header("Location: index.php"); exit;
+        }
+    }
 }
 
 // 3. CONSULTAS
+// Pedido en curso del driver actual
 $stmt = $pdo->prepare("SELECT * FROM ventas WHERE id_driver = ? AND estado_delivery = 'en_camino'");
 $stmt->execute([$id_driver]);
 $mis_pedidos = $stmt->fetchAll();
 
+// Pedidos disponibles (Sin driver)
 $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' AND estado_delivery = 'confirmado' AND id_driver IS NULL ORDER BY id ASC")->fetchAll();
 ?>
 <!DOCTYPE html>
@@ -54,7 +68,7 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
     
     <style>
-        /* RESET TOTAL PARA EVITAR COLUMNAS */
+        /* RESET BÁSICO */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body { 
@@ -64,114 +78,47 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
             padding-bottom: 50px;
         }
 
-        /* --- 1. HEADER SUPERIOR FIJO (TIPO APP) --- */
+        /* HEADER */
         .app-bar {
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            background: #111;
-            border-bottom: 1px solid #333;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between; /* Logo izq, Usuario der */
-            align-items: center;
-            width: 100%;
-            height: 70px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            position: sticky; top: 0; z-index: 1000;
+            background: #111; border-bottom: 1px solid #333;
+            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+            height: 70px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-
-        .logo-text {
-            color: #FFD700; /* Royal Gold */
-            font-weight: 800;
-            font-size: 1.2rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex; align-items: center; gap: 8px;
-        }
-
-        .user-panel {
-            display: flex; align-items: center; gap: 15px;
-        }
-        
-        .user-info { text-align: right; font-size: 0.8rem; line-height: 1.2; color: #aaa; }
+        .logo-text { color: #FFD700; font-weight: 800; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; }
+        .user-panel { display: flex; align-items: center; gap: 15px; }
+        .user-info { text-align: right; font-size: 0.8rem; color: #aaa; }
         .user-info b { display: block; color: #fff; font-size: 0.9rem; }
+        .btn-off { color: #ef5350; border: 1px solid #ef5350; width: 35px; height: 35px; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-decoration: none; }
 
-        .btn-off {
-            color: #ef5350; border: 1px solid #ef5350;
-            width: 35px; height: 35px; border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            text-decoration: none; font-size: 1rem;
-        }
-
-        /* --- 2. CONTENEDOR ÚNICO VERTICAL --- */
-        .main-list {
-            display: flex;
-            flex-direction: column; /* FUERZA A TODO A IR HACIA ABAJO */
-            padding: 20px;
-            width: 100%;
-            max-width: 600px; /* En PC se ve centrado, en móvil llena todo */
-            margin: 0 auto;
-        }
-
-        /* TÍTULOS DE SECCIÓN */
-        .section-label {
-            color: #666; font-size: 0.8rem; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 1px;
-            margin: 20px 0 10px 0;
-            display: flex; align-items: center; gap: 8px;
-        }
+        /* CONTENEDOR PRINCIPAL */
+        .main-list { display: flex; flex-direction: column; padding: 20px; width: 100%; max-width: 600px; margin: 0 auto; }
+        .section-label { color: #666; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; margin: 20px 0 10px 0; display: flex; align-items: center; gap: 8px; }
         .dot { width: 8px; height: 8px; background: #66bb6a; border-radius: 50%; animation: blink 1s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
 
-        /* --- 3. TARJETAS DE PEDIDO (VERTICALES) --- */
-        .order-card {
-            background: #151515;
-            border: 1px solid #333;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            width: 100%; /* Ocupa todo el ancho disponible */
-            position: relative;
-        }
+        /* TARJETAS */
+        .order-card { background: #151515; border: 1px solid #333; border-radius: 12px; padding: 20px; margin-bottom: 20px; position: relative; }
+        .order-card.active { border: 2px solid #FFD700; background: #1a1a08; }
 
-        .order-card.active {
-            border: 2px solid #FFD700;
-            background: #1a1a08;
-        }
-
-        /* Cabecera de la Tarjeta: ID y Precio */
-        .card-row-top {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 10px;
-        }
+        .card-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 10px; }
         .badge-id { background: #333; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; }
         .big-price { font-size: 1.5rem; font-weight: 800; color: #fff; }
 
-        /* Filas de Icono + Texto */
-        .card-row {
-            display: flex; gap: 15px; margin-bottom: 12px; align-items: flex-start;
-        }
+        .card-row { display: flex; gap: 15px; margin-bottom: 12px; align-items: flex-start; }
         .icon { width: 20px; text-align: center; color: #FFD700; font-size: 1.1rem; margin-top: 2px; }
         .text { flex: 1; color: #ccc; font-size: 0.95rem; }
         .text strong { color: #fff; }
 
-        /* Botones Grandes */
-        .btn-action {
-            width: 100%;
-            padding: 15px;
-            border: none; border-radius: 8px;
-            font-weight: 800; font-size: 1rem;
-            text-transform: uppercase;
-            cursor: pointer; margin-top: 10px;
-            display: flex; justify-content: center; align-items: center; gap: 10px;
-        }
+        /* BOTONES */
+        .btn-action { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: 800; font-size: 1rem; text-transform: uppercase; cursor: pointer; margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 10px; }
         .btn-gold { background: #FFD700; color: #000; }
         .btn-green { background: #66bb6a; color: #000; }
-        .btn-link { 
-            display: block; width: 100%; text-align: center; padding: 10px; 
-            color: #4fc3f7; text-decoration: none; font-weight: bold; border: 1px solid #333; 
-            border-radius: 8px; margin-top: 5px; 
-        }
+        
+        /* Estilo Botón Cancelar/Liberar */
+        .btn-cancel { background: #2a0a0a; color: #ef5350; border: 1px solid #ef5350; font-size: 0.9rem; padding: 12px; margin-top: 15px; }
+        
+        .btn-link { display: block; width: 100%; text-align: center; padding: 12px; background: #000; color: #4fc3f7; text-decoration: none; font-weight: bold; border: 1px solid #4fc3f7; border-radius: 8px; margin-top: 10px; }
 
         .empty-state { text-align: center; padding: 40px; color: #555; background: #111; border-radius: 12px; }
         .alerta { background: #333; padding: 10px; text-align: center; border-radius: 8px; margin-bottom: 20px; }
@@ -181,13 +128,9 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
 <body>
 
     <div class="app-bar">
-        <div class="logo-text">
-            <i class="fa-solid fa-motorcycle"></i> Royal Go
-        </div>
+        <div class="logo-text"><i class="fa-solid fa-motorcycle"></i> Royal Go</div>
         <div class="user-panel">
-            <div class="user-info">
-                Hola, <b><?= explode(' ', $_SESSION['nombre'])[0] ?></b>
-            </div>
+            <div class="user-info">Hola, <b><?= explode(' ', $_SESSION['nombre'])[0] ?></b></div>
             <a href="../../logout.php" class="btn-off"><i class="fa-solid fa-power-off"></i></a>
         </div>
     </div>
@@ -218,7 +161,7 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
                         <div class="icon"><i class="fa-brands fa-whatsapp"></i></div>
                         <div class="text">
                             <a href="https://wa.me/51<?= preg_replace('/[^0-9]/', '', $p['telefono_contacto']) ?>" target="_blank" style="color:#25D366; text-decoration:none; font-weight:bold;">
-                                Abrir WhatsApp
+                                Enviar Mensaje
                             </a>
                         </div>
                     </div>
@@ -227,33 +170,62 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
                         <div class="icon"><i class="fa-solid fa-location-dot"></i></div>
                         <div class="text">
                             <?= $p['direccion_entrega'] ?>
-                            <a href="https://waze.com/ul?ll=<?= $p['latitud'] ?>,<?= $p['longitud'] ?>&navigate=yes" target="_blank" class="btn-link">
-                                <i class="fa-solid fa-diamond-turn-right"></i> IR CON WAZE
+                            
+                            <?php 
+                                // Si tenemos latitud/longitud, usamos navegación directa por coordenadas
+                                if (!empty($p['latitud']) && !empty($p['longitud'])) {
+                                    // navigate=yes obliga a navegar desde la ubicación actual
+                                    $wazeUrl = "https://waze.com/ul?ll={$p['latitud']},{$p['longitud']}&navigate=yes";
+                                    $textoWaze = "NAVEGAR CON GPS (AUTOMÁTICO)";
+                                } else {
+                                    // Fallback: Si no hay coordenadas, busca por dirección escrita
+                                    $wazeUrl = "https://waze.com/ul?q=" . urlencode($p['direccion_entrega']) . "&navigate=yes";
+                                    $textoWaze = "BUSCAR EN WAZE";
+                                }
+                            ?>
+                            <a href="<?= $wazeUrl ?>" target="_blank" class="btn-link">
+                                <i class="fa-brands fa-waze"></i> <?= $textoWaze ?>
                             </a>
                         </div>
                     </div>
 
                     <div style="background:#000; padding:10px; border-radius:6px; margin-top:10px; margin-bottom:15px; display:flex; justify-content:space-between;">
-                        <span style="color:#888;">Método Pago:</span>
+                        <span style="color:#888;">Pago:</span>
                         <strong style="color:#FFD700;"><?= $p['metodo_pago'] ?></strong>
                     </div>
 
-                    <form method="POST" onsubmit="return confirm('¿Confirmas entrega?');">
+                    <form method="POST" onsubmit="return confirm('¿Confirmas que ya entregaste el pedido y cobraste?');">
                         <input type="hidden" name="accion" value="entregar">
                         <input type="hidden" name="id_venta" value="<?= $p['id'] ?>">
                         <button class="btn-action btn-green">
-                            <i class="fa-solid fa-check"></i> ENTREGAR
+                            <i class="fa-solid fa-check"></i> CONFIRMAR ENTREGA
+                        </button>
+                    </form>
+
+                    <form method="POST" onsubmit="return confirm('¿Seguro que deseas soltar este pedido? Volverá a la lista de disponibles.');">
+                        <input type="hidden" name="accion" value="liberar">
+                        <input type="hidden" name="id_venta" value="<?= $p['id'] ?>">
+                        <button class="btn-action btn-cancel">
+                            <i class="fa-solid fa-triangle-exclamation"></i> NO PUEDO ENTREGAR (LIBERAR)
                         </button>
                     </form>
 
                     <script>
+                        // Envia ubicación cada 10 segs
                         setInterval(() => {
                             if(navigator.geolocation) {
                                 navigator.geolocation.getCurrentPosition(pos => {
-                                    fetch('../../api/gps.php', { method: 'POST', body: JSON.stringify({ id_venta: <?= $p['id'] ?>, lat: pos.coords.latitude, lon: pos.coords.longitude }) });
-                                });
+                                    fetch('../../api/gps.php', { 
+                                        method: 'POST', 
+                                        body: JSON.stringify({ 
+                                            id_venta: <?= $p['id'] ?>, 
+                                            lat: pos.coords.latitude, 
+                                            lon: pos.coords.longitude 
+                                        }) 
+                                    });
+                                }, null, { enableHighAccuracy: true });
                             }
-                        }, 5000);
+                        }, 10000);
                     </script>
                 </div>
             <?php endforeach; ?>
@@ -265,7 +237,7 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
         <?php if(count($disponibles) == 0): ?>
             <div class="empty-state">
                 <i class="fa-solid fa-mug-hot" style="font-size:2rem; margin-bottom:10px;"></i>
-                <p>Esperando pedidos...</p>
+                <p>No hay pedidos pendientes...</p>
             </div>
         <?php endif; ?>
 
@@ -299,8 +271,10 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
     </div>
 
     <script>
-        // Auto-recarga para ver nuevos pedidos
-        setTimeout(() => { if(!document.querySelector('.order-card.active')) location.reload(); }, 10000);
+        // Auto-refresh para ver si caen nuevos pedidos (Solo si no tengo uno activo)
+        setTimeout(() => { 
+            if(!document.querySelector('.order-card.active')) location.reload(); 
+        }, 15000);
     </script>
 </body>
 </html>
