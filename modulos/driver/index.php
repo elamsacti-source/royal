@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once '../../config/db.php';
+require_once '../../config/db.php'; //
 
 // 1. SEGURIDAD
 if (!isset($_SESSION['user_id']) || $_SESSION['rol'] != 'driver') {
@@ -18,12 +18,11 @@ if (isset($_POST['accion'])) {
     // ACEPTAR PEDIDO
     if ($_POST['accion'] == 'aceptar') {
         // Verificamos que siga libre
-        $check = $pdo->prepare("SELECT id FROM ventas WHERE id = ? AND id_driver IS NULL");
+        $check = $pdo->prepare("SELECT id FROM ventas WHERE id = ? AND id_driver IS NULL"); //
         $check->execute([$id_venta]);
         if ($check->fetch()) {
             $stmt = $pdo->prepare("UPDATE ventas SET id_driver = ?, estado_delivery = 'en_camino' WHERE id = ?");
             $stmt->execute([$id_driver, $id_venta]);
-            // Recargar para evitar reenvío de formulario
             header("Location: index.php"); exit;
         } else {
             $mensaje = "<div class='alerta error'>⚠️ El pedido ya fue tomado por otro driver.</div>";
@@ -40,7 +39,7 @@ if (isset($_POST['accion'])) {
 
     // LIBERAR PEDIDO (CANCELAR COMO DRIVER)
     if ($_POST['accion'] == 'liberar') {
-        // Regresa el pedido a estado 'confirmado' y quita al driver (id_driver = NULL)
+        // Regresa el pedido a 'confirmado' y quita al driver actual
         $stmt = $pdo->prepare("UPDATE ventas SET id_driver = NULL, estado_delivery = 'confirmado' WHERE id = ? AND id_driver = ?");
         if ($stmt->execute([$id_venta, $id_driver])) {
             header("Location: index.php"); exit;
@@ -49,13 +48,13 @@ if (isset($_POST['accion'])) {
 }
 
 // 3. CONSULTAS
-// CORRECCIÓN PRINCIPAL: Busca pedidos asignados a mí, incluso si el estado se regresó a 'confirmado' por error.
-$stmt = $pdo->prepare("SELECT * FROM ventas WHERE id_driver = ? AND estado_delivery IN ('en_camino', 'confirmado')");
+// Pedido en curso del driver actual
+$stmt = $pdo->prepare("SELECT * FROM ventas WHERE id_driver = ? AND estado_delivery = 'en_camino'"); //
 $stmt->execute([$id_driver]);
 $mis_pedidos = $stmt->fetchAll();
 
 // Pedidos disponibles (Sin driver)
-$disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' AND estado_delivery = 'confirmado' AND id_driver IS NULL ORDER BY id ASC")->fetchAll();
+$disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' AND estado_delivery = 'confirmado' AND id_driver IS NULL ORDER BY id ASC")->fetchAll(); //
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -67,7 +66,7 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
     
     <style>
-        /* RESET BÁSICO */
+        /* RESET */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body { 
@@ -113,6 +112,8 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
         .btn-action { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: 800; font-size: 1rem; text-transform: uppercase; cursor: pointer; margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 10px; }
         .btn-gold { background: #FFD700; color: #000; }
         .btn-green { background: #66bb6a; color: #000; }
+        
+        /* Botón Cancelar */
         .btn-cancel { background: #2a0a0a; color: #ef5350; border: 1px solid #ef5350; font-size: 0.9rem; padding: 12px; margin-top: 15px; }
         
         .btn-link { display: block; width: 100%; text-align: center; padding: 12px; background: #000; color: #4fc3f7; text-decoration: none; font-weight: bold; border: 1px solid #4fc3f7; border-radius: 8px; margin-top: 10px; }
@@ -169,10 +170,13 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
                             <?= $p['direccion_entrega'] ?>
                             
                             <?php 
+                                // Si hay coordenadas, forzamos navegación desde ubicación actual
                                 if (!empty($p['latitud']) && !empty($p['longitud'])) {
+                                    // navigate=yes obliga a Waze a trazar la ruta desde TU ubicación
                                     $wazeUrl = "https://waze.com/ul?ll={$p['latitud']},{$p['longitud']}&navigate=yes";
                                     $textoWaze = "NAVEGAR CON GPS (AUTOMÁTICO)";
                                 } else {
+                                    // Si no hay coordenadas, busca por texto
                                     $wazeUrl = "https://waze.com/ul?q=" . urlencode($p['direccion_entrega']) . "&navigate=yes";
                                     $textoWaze = "BUSCAR EN WAZE";
                                 }
@@ -188,7 +192,7 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
                         <strong style="color:#FFD700;"><?= $p['metodo_pago'] ?></strong>
                     </div>
 
-                    <form method="POST" onsubmit="return confirm('¿Confirmas que ya entregaste el pedido y cobraste?');">
+                    <form method="POST" onsubmit="return confirm('¿Confirmas la entrega?');">
                         <input type="hidden" name="accion" value="entregar">
                         <input type="hidden" name="id_venta" value="<?= $p['id'] ?>">
                         <button class="btn-action btn-green">
@@ -196,11 +200,11 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
                         </button>
                     </form>
 
-                    <form method="POST" onsubmit="return confirm('¿Seguro que deseas soltar este pedido? Volverá a la lista de disponibles.');">
+                    <form method="POST" onsubmit="return confirm('¿Soltar pedido? Volverá a la lista de disponibles.');">
                         <input type="hidden" name="accion" value="liberar">
                         <input type="hidden" name="id_venta" value="<?= $p['id'] ?>">
                         <button class="btn-action btn-cancel">
-                            <i class="fa-solid fa-triangle-exclamation"></i> NO PUEDO ENTREGAR (LIBERAR)
+                            <i class="fa-solid fa-triangle-exclamation"></i> LIBERAR PEDIDO
                         </button>
                     </form>
 
@@ -224,13 +228,12 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
             <?php endforeach; ?>
         <?php endif; ?>
 
-
         <div class="section-label">DISPONIBLES (<?= count($disponibles) ?>)</div>
 
         <?php if(count($disponibles) == 0): ?>
             <div class="empty-state">
                 <i class="fa-solid fa-mug-hot" style="font-size:2rem; margin-bottom:10px;"></i>
-                <p>No hay pedidos pendientes...</p>
+                <p>Buscando pedidos nuevos...</p>
             </div>
         <?php endif; ?>
 
@@ -240,23 +243,18 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
                     <span class="badge-id">Nuevo #<?= $d['id'] ?></span>
                     <span class="big-price">S/ <?= number_format($d['total'], 2) ?></span>
                 </div>
-
                 <div class="card-row">
                     <div class="icon"><i class="fa-solid fa-location-dot"></i></div>
                     <div class="text"><?= $d['direccion_entrega'] ?></div>
                 </div>
-
                 <div class="card-row">
                     <div class="icon"><i class="fa-solid fa-money-bill"></i></div>
                     <div class="text">Cobrar: <strong><?= $d['metodo_pago'] ?></strong></div>
                 </div>
-
                 <form method="POST">
                     <input type="hidden" name="accion" value="aceptar">
                     <input type="hidden" name="id_venta" value="<?= $d['id'] ?>">
-                    <button class="btn-action btn-gold">
-                        TOMAR PEDIDO
-                    </button>
+                    <button class="btn-action btn-gold">TOMAR PEDIDO</button>
                 </form>
             </div>
         <?php endforeach; ?>
@@ -264,9 +262,13 @@ $disponibles = $pdo->query("SELECT * FROM ventas WHERE tipo_venta = 'delivery' A
     </div>
 
     <script>
+        // AUTO-RECARGA (Cada 10 segundos)
+        // Solo recarga si NO tienes un pedido activo en pantalla (para no interrumpirte)
         setTimeout(() => { 
-            if(!document.querySelector('.order-card.active')) location.reload(); 
-        }, 15000);
+            if(!document.querySelector('.order-card.active')) {
+                location.reload(); 
+            }
+        }, 10000);
     </script>
 </body>
 </html>

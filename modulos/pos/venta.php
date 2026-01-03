@@ -22,32 +22,24 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
     <link rel="stylesheet" href="../../assets/css/estilos.css?v=<?= time() ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     <style>
-        /* =========================================
-           LAYOUT MAESTRO (SIN SCROLL GENERAL)
-           ========================================= */
+        /* LAYOUT */
         body { 
             margin: 0; padding: 0; 
             height: 100vh; width: 100vw; 
-            overflow: hidden; /* Bloquea scroll del body */
+            overflow: hidden; 
             background: #000; 
             font-family: 'Poppins', sans-serif;
         }
 
-        .pos-container { 
-            display: flex; 
-            height: 100vh; 
-            width: 100%;
-        }
+        .pos-container { display: flex; height: 100vh; width: 100%; }
 
-        /* --- PANEL IZQUIERDO (PRODUCTOS) --- */
+        /* PANEL IZQUIERDO */
         .pos-left { 
-            flex: 7; 
-            background: #0a0a0a; 
-            display: flex; 
-            flex-direction: column; 
-            padding: 15px;
-            border-right: 1px solid #222;
+            flex: 7; background: #0a0a0a; display: flex; 
+            flex-direction: column; padding: 15px; border-right: 1px solid #222;
         }
 
         .left-header { flex: 0 0 auto; margin-bottom: 10px; }
@@ -68,15 +60,11 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
             box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
         }
 
-        .product-list-container {
-            flex: 1; overflow-y: auto; padding-right: 5px;
-        }
+        .product-list-container { flex: 1; overflow-y: auto; padding-right: 5px; }
         .product-list-container::-webkit-scrollbar { width: 6px; }
         .product-list-container::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 
-        .product-grid { 
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; 
-        }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 
         .product-card { 
             background: #151515; padding: 10px; border-radius: 10px; border: 1px solid #2a2a2a; 
@@ -89,18 +77,16 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         .combo-tag { position: absolute; top: 5px; right: 5px; color: #FFD700; font-size: 0.8rem; }
         .cat-badge { font-size: 0.65rem; color: #666; display: block; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* --- PANEL DERECHO (CARRITO) --- */
+        /* PANEL DERECHO */
         .pos-right { 
             flex: 3; background: #111; display: flex; flex-direction: column; 
             height: 100vh; border-left: 1px solid #333; z-index: 50;
         }
 
         .ticket-header { flex: 0 0 auto; padding: 15px; background: #000; border-bottom: 1px solid #222; text-align: center; }
-        
         .ticket-body { flex: 1; overflow-y: auto; padding: 10px; }
         .ticket-body::-webkit-scrollbar { width: 5px; }
         .ticket-body::-webkit-scrollbar-thumb { background: #333; }
-
         .ticket-footer { flex: 0 0 auto; padding: 20px; background: #0d0d0d; border-top: 1px solid #222; }
 
         .ticket-item { 
@@ -108,12 +94,10 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
             display: flex; justify-content: space-between; align-items: flex-start; 
         }
 
-        /* --- ESTILOS PARA INPUTS EN CARRITO --- */
         .cart-controls { display: flex; gap: 5px; margin-top: 8px; align-items: center; }
         .cart-qty-input {
             width: 50px; background: #222; border: 1px solid #444; color: #fff;
-            text-align: center; padding: 5px; border-radius: 4px; font-weight: bold;
-            font-size: 1rem;
+            text-align: center; padding: 5px; border-radius: 4px; font-weight: bold; font-size: 1rem;
         }
         .cart-mode-select {
             background: #222; border: 1px solid #444; color: var(--royal-gold);
@@ -123,7 +107,7 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 
         .mobile-cart-btn { display: none; }
 
-        /* --- ESTILOS DEL BOTÓN DE NOTIFICACIÓN DELIVERY --- */
+        /* BOTÓN DE NOTIFICACIÓN DELIVERY */
         #btn-delivery-notify {
             background: #333; color: #888; border: 1px solid #555; 
             padding: 8px 15px; border-radius: 5px; text-decoration: none; 
@@ -132,13 +116,11 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         }
         #btn-delivery-notify.activo {
             background: #ef5350; color: #fff; border-color: #ef5350;
-            animation: latido 0.8s infinite; /* Latido más rápido */
+            animation: latido 0.8s infinite; 
         }
         @keyframes latido { 0% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 15px #ef5350; } 100% { transform: scale(1); } }
 
-        /* =========================================
-           ESTILOS IMPRESIÓN (TM-U220)
-           ========================================= */
+        /* TICKET IMPRESIÓN */
         #ticket-impresion { display: none; }
         @media print {
             body * { visibility: hidden; height: 0; }
@@ -161,7 +143,7 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
             .t-detail { font-size: 9px; margin-left: 5px; white-space: normal; }
         }
 
-        /* Responsive Móvil */
+        /* RESPONSIVE */
         @media (max-width: 768px) {
             .pos-container { flex-direction: column; }
             .pos-left { flex: 1; padding-bottom: 60px; }
@@ -280,26 +262,28 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
 <script>
-    // --- LÓGICA DE NOTIFICACIÓN DELIVERY (MEJORADA) ---
+    // --- LÓGICA DE NOTIFICACIÓN DELIVERY CON VOZ ---
     let lastCount = 0;
+    let audioAlerta = new Audio('../../assets/notification.mp3');
 
     function checkPedidos() {
-        fetch('../../api/check_pedidos.php')
+        // Truco: ?t=TIMESTAMP evita caché
+        fetch('../../api/check_pedidos.php?t=' + Date.now())
             .then(r => r.json())
             .then(data => {
                 const btn = document.getElementById('btn-delivery-notify');
                 const span = document.getElementById('delivery-count');
                 const count = parseInt(data.pendientes);
 
-                span.innerText = count;
+                if(span) span.innerText = count;
 
                 if (count > 0) {
                     btn.classList.add('activo');
                     btn.innerHTML = `<i class="fa-solid fa-motorcycle"></i> ${count} PEDIDOS WEB`;
                     
-                    // Solo si hay MÁS pedidos que la última vez, activamos la alerta de voz
+                    // Si hay NUEVOS pedidos respecto a la última revisión
                     if (count > lastCount) {
-                        reproducirVoz();
+                        dispararAlerta();
                     }
                 } else {
                     btn.classList.remove('activo');
@@ -307,39 +291,46 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
                 }
                 lastCount = count;
             })
-            .catch(err => console.log('Esperando API delivery...'));
+            .catch(err => console.log('Esperando conexión...'));
     }
 
-    function reproducirVoz() {
-        // Verificar soporte del navegador
+    function dispararAlerta() {
+        // 1. Sonido MP3
+        audioAlerta.play().catch(e => console.log("Audio bloqueado"));
+
+        // 2. Voz TTS (NUEVO)
         if ('speechSynthesis' in window) {
-            // Cancelar cola anterior por si acaso
-            window.speechSynthesis.cancel();
-
-            let frase = "¡Atención! ¡Nuevo pedido de Delivery! Por favor, revise la tablet.";
-            let mensaje = new SpeechSynthesisUtterance(frase);
-            
-            // Configuración para que sea más "Alerta"
-            mensaje.lang = 'es-ES';
-            mensaje.rate = 1.1; // Un poco rápido
-            mensaje.pitch = 1.1; // Tono ligeramente agudo
-            mensaje.volume = 1;
-
-            // ENCOLAR 3 VECES PARA QUE SEA INSISTENTE
-            window.speechSynthesis.speak(mensaje);
-            window.speechSynthesis.speak(mensaje);
-            window.speechSynthesis.speak(mensaje);
-        } else {
-            // Fallback para navegadores antiguos: Beep repetido
-            let audio = new Audio('../../assets/beep.mp3'); 
-            audio.play();
-            setTimeout(() => audio.play(), 1500);
-            setTimeout(() => audio.play(), 3000);
+            let msg = new SpeechSynthesisUtterance("¡Atención! Nuevo pedido de delivery.");
+            window.speechSynthesis.speak(msg);
         }
+
+        // 3. Alerta Visual
+        Swal.fire({
+            icon: 'warning',
+            title: '¡NUEVO PEDIDO!',
+            text: 'Tienes una orden de Delivery esperando.',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: true,
+            confirmButtonText: 'VER',
+            confirmButtonColor: '#FFD700',
+            background: '#1a1a1a',
+            color: '#fff',
+            iconColor: '#FFD700',
+            timer: 10000, 
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('click', () => {
+                    window.location.href = 'delivery.php';
+                });
+            }
+        });
     }
 
-    // Iniciar chequeo cada 10 segundos
-    setInterval(checkPedidos, 10000);
+    // Iniciar chequeo cada 4 segundos
+    setInterval(checkPedidos, 4000);
+    setTimeout(checkPedidos, 1000);
+    
     
     // --- LÓGICA DEL POS (Cajas, Carrito, etc.) ---
     let carrito = [];
@@ -363,9 +354,6 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
                 catDiv.appendChild(btn);
             });
             renderProductos(data);
-            
-            // Revisar pedidos al cargar
-            checkPedidos();
         });
 
     function filtrarCategoria(cat, btn) {
@@ -385,7 +373,6 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         }
 
         lista.forEach(p => {
-            // STOCK CONTROL: Si es <= 0, se bloquea visualmente
             let sinStock = (p.stock_actual <= 0);
             let opacity = sinStock ? 0.4 : 1;
             let cursor = sinStock ? 'not-allowed' : 'pointer';
@@ -394,13 +381,9 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
             let packIcon = (p.es_combo == 1) ? '<i class="fa-solid fa-gift combo-tag"></i>' : '';
             let catLabel = p.categoria ? `<span class="cat-badge">${p.categoria}</span>` : '';
             
-            // Texto de stock
-            let stockHtml = '';
-            if(sinStock) {
-                stockHtml = `<small style="color:#ef5350; font-weight:bold;">AGOTADO</small>`;
-            } else {
-                stockHtml = `<small style="color:#66bb6a;">Disp: ${p.stock_actual}</small>`;
-            }
+            let stockHtml = sinStock ? 
+                `<small style="color:#ef5350; font-weight:bold;">AGOTADO</small>` : 
+                `<small style="color:#66bb6a;">Disp: ${p.stock_actual}</small>`;
             
             div.innerHTML += `
             <div class="product-card ${claseExtra}" style="opacity:${opacity}; cursor:${cursor};" onclick="agregar(${p.id})">
@@ -415,21 +398,19 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         });
     }
 
-    // 2. AGREGAR AL CARRITO (CON LÓGICA DE PRECIOS Y MODOS)
+    // 2. AGREGAR AL CARRITO
     function agregar(id) {
         const p = productos.find(x => x.id == id);
         
         if(p.stock_actual <= 0) {
             let msg = (p.es_combo == 1) ? '⚠️ Faltan insumos para este Pack.' : '⚠️ Producto agotado.';
-            return alert(msg);
+            return Swal.fire({icon: 'error', title: 'Oops...', text: msg, background: '#111', color: '#fff'});
         }
         
         const item = carrito.find(x => x.id == id);
         if(item) {
-            // Si ya existe, sumamos 1, validando stock
             validarYActualizarCantidad(item, item.cant + 1);
         } else {
-            // Nuevo item con datos extendidos
             carrito.push({
                 id: p.id, 
                 nombre: p.nombre, 
@@ -438,7 +419,7 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
                 unidades_caja: parseInt(p.unidades_caja || 1),    
                 precio_aplicado: parseFloat(p.precio_venta),      
                 cant: 1, 
-                modo: 'unidad', // 'unidad' o 'caja'
+                modo: 'unidad', 
                 es_combo: p.es_combo, 
                 descripcion_combo: p.descripcion_combo, 
                 stock_max: p.stock_actual 
@@ -449,17 +430,17 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 
     function validarYActualizarCantidad(item, nuevaCant) {
         let descuentoTotal = nuevaCant;
-        
-        if (item.modo === 'caja') {
-            descuentoTotal = nuevaCant * item.unidades_caja;
-        }
+        if (item.modo === 'caja') descuentoTotal = nuevaCant * item.unidades_caja;
 
         if (descuentoTotal > item.stock_max) {
-            // Opcional: Permitir venta negativa quitando este if, pero lo mantenemos por seguridad
-            alert(`⚠️ Stock insuficiente. Tienes ${item.stock_max} unidades, intentas llevar ${descuentoTotal} (equivalente).`);
+            Swal.fire({
+                icon: 'warning', 
+                title: 'Stock Insuficiente', 
+                text: `Tienes ${item.stock_max} unidades disponibles.`, 
+                background: '#111', color: '#fff'
+            });
             return; 
         }
-        
         item.cant = nuevaCant;
     }
 
@@ -468,14 +449,11 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
         div.innerHTML = '';
         let total = 0;
         
-        // Usamos slice y reverse para mostrar los ultimos arriba, 
-        // pero necesitamos el indice real para eliminar/editar
         carrito.slice().reverse().forEach((p, idx) => {
             const realIdx = carrito.length - 1 - idx;
             const subtotal = p.precio_aplicado * p.cant;
             total += subtotal;
 
-            // Generar selector si el producto tiene opción de caja
             let selectorModo = '';
             if (p.unidades_caja > 1 && p.es_combo == 0) {
                 selectorModo = `
@@ -489,15 +467,12 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
             <div class="ticket-item">
                 <div style="flex:1;">
                     <div style="color:#fff; font-size:0.9rem; margin-bottom:4px;">${p.nombre}</div>
-                    
                     <div class="cart-controls">
                         <input type="number" class="cart-qty-input" value="${p.cant}" min="1" 
                                onchange="cambiarCantidad(${realIdx}, this.value)">
-                        
                         ${selectorModo}
                     </div>
                 </div>
-                
                 <div style="text-align:right;">
                     <div style="color:var(--royal-gold); font-weight:bold;">S/ ${subtotal.toFixed(2)}</div>
                     <small style="color:#666;">PU: ${p.precio_aplicado.toFixed(2)}</small>
@@ -515,28 +490,18 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 
     function cambiarCantidad(idx, val) {
         const nuevaCant = parseFloat(val);
-        if (nuevaCant > 0) {
-            validarYActualizarCantidad(carrito[idx], nuevaCant);
-        }
+        if (nuevaCant > 0) validarYActualizarCantidad(carrito[idx], nuevaCant);
         actualizarCarrito(); 
     }
 
     function cambiarModo(idx, nuevoModo) {
         const item = carrito[idx];
         item.modo = nuevoModo;
-
         if (nuevoModo === 'caja') {
-            if (item.precio_caja > 0) {
-                item.precio_aplicado = item.precio_caja;
-            } else {
-                // Si no configuraron precio caja, calculamos x cantidad
-                item.precio_aplicado = item.precio_unitario * item.unidades_caja;
-            }
+            item.precio_aplicado = (item.precio_caja > 0) ? item.precio_caja : (item.precio_unitario * item.unidades_caja);
         } else {
             item.precio_aplicado = item.precio_unitario;
         }
-        
-        // Validar de nuevo el stock al cambiar de modo
         validarYActualizarCantidad(item, item.cant);
         actualizarCarrito();
     }
@@ -546,53 +511,37 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
 
     // 3. COBRO
     function cobrar() {
-        if(carrito.length === 0) return alert('Carrito vacío');
+        if(carrito.length === 0) return Swal.fire('Carrito vacío');
         document.getElementById('payment-modal').style.display = 'flex';
     }
 
     function procesarPago(metodo) {
-        let totalStr = document.getElementById('total-amount').innerText;
-        totalStr = totalStr.replace('S/', '').trim(); 
-        const total = totalStr;
-
+        let totalStr = document.getElementById('total-amount').innerText.replace('S/', '').trim(); 
+        
         document.getElementById('payment-modal').innerHTML = '<h2 style="color:#fff;">Procesando...</h2>';
 
         fetch('backend_venta.php?action=procesar', {
             method: 'POST', 
             body: JSON.stringify({ 
                 items: carrito.map(i => ({ 
-                    id: i.id, 
-                    cantidad: i.cant, 
-                    precio: i.precio_aplicado, 
-                    es_combo: i.es_combo,
-                    modo: i.modo 
+                    id: i.id, cantidad: i.cant, precio: i.precio_aplicado, es_combo: i.es_combo, modo: i.modo 
                 })), 
-                total: total,
+                total: totalStr,
                 metodo_pago: metodo
             })
         })
         .then(res => res.json())
         .then(data => {
             if(data.success) {
-                // Imprimir Ticket
                 document.getElementById('print-id-venta').innerText = data.id_venta;
                 document.getElementById('print-metodo').innerText = "PAGO: " + metodo.toUpperCase();
-                document.getElementById('print-total').innerText = 'S/ ' + total;
+                document.getElementById('print-total').innerText = 'S/ ' + totalStr;
                 let html = '';
                 carrito.forEach(i => {
-                    let nom = i.nombre.length > 16 ? i.nombre.substring(0,16) : i.nombre;
-                    // Mostrar si es Caja en el ticket
                     let labelModo = (i.modo === 'caja') ? ' (CJ)' : '';
-                    
-                    html += `<div class="t-row">
-                                <div class="col-prod">${nom}${labelModo}</div>
-                                <div class="col-cant">${i.cant}</div>
-                                <div class="col-total">${(i.precio_aplicado*i.cant).toFixed(2)}</div>
-                             </div>`;
-                    if(i.es_combo==1 && i.descripcion_combo) html += `<div class="t-detail">${i.descripcion_combo.substring(0,30)}</div>`;
+                    html += `<div class="t-row"><div class="col-prod">${i.nombre}${labelModo}</div><div class="col-cant">${i.cant}</div><div class="col-total">${(i.precio_aplicado*i.cant).toFixed(2)}</div></div>`;
                 });
                 document.getElementById('print-items').innerHTML = html;
-
                 window.print();
                 location.reload();
             } else { 

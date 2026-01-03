@@ -2,25 +2,19 @@
 require_once '../../config/db.php';
 include '../../includes/header_admin.php';
 
-// --- CONSULTAS DE DATOS --- //
-
-// 1. Total Productos Físicos
+// CONSULTAS (Misma lógica, solo cambiamos visualización)
 $stmt = $pdo->query("SELECT COUNT(*) FROM productos WHERE es_combo = 0");
 $total_productos = $stmt->fetchColumn();
 
-// 2. Valor Inventario Total
 $stmt = $pdo->query("SELECT SUM(precio_compra * stock_actual) FROM productos");
 $valor_inventario = $stmt->fetchColumn() ?: 0;
 
-// 3. Productos con Stock Bajo (Crítico < 5)
 $stmt = $pdo->query("SELECT COUNT(*) FROM productos WHERE stock_actual <= 5 AND es_combo = 0");
 $stock_bajo = $stmt->fetchColumn();
 
-// 4. Total Packs Creados
 $stmt = $pdo->query("SELECT COUNT(*) FROM productos WHERE es_combo = 1");
 $total_packs = $stmt->fetchColumn();
 
-// 5. Ventas del Día (Ejemplo con fecha de hoy)
 $hoy = date('Y-m-d');
 $stmt = $pdo->query("SELECT SUM(total) FROM ventas WHERE DATE(fecha) = '$hoy'");
 $venta_dia = $stmt->fetchColumn() ?: 0;
@@ -37,7 +31,7 @@ $venta_dia = $stmt->fetchColumn() ?: 0;
         <div class="stat-card">
             <div class="stat-info">
                 <span>Ventas del Día</span>
-                <h3 style="color: #FFD700;">$<?= number_format($venta_dia, 2) ?></h3>
+                <h3 style="color: #FFD700;">S/ <?= number_format($venta_dia, 2) ?></h3>
             </div>
             <div class="stat-icon"><i class="fa-solid fa-cash-register"></i></div>
         </div>
@@ -45,7 +39,7 @@ $venta_dia = $stmt->fetchColumn() ?: 0;
         <div class="stat-card">
             <div class="stat-info">
                 <span>Dinero en Licor</span>
-                <h3>$<?= number_format($valor_inventario, 0) ?></h3>
+                <h3>S/ <?= number_format($valor_inventario, 0) ?></h3>
             </div>
             <div class="stat-icon"><i class="fa-solid fa-sack-dollar"></i></div>
         </div>

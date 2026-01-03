@@ -7,7 +7,6 @@ $productos = $stmt->fetchAll();
 $mensaje = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // (Misma lógica PHP de guardado del combo)
     try {
         $pdo->beginTransaction();
         $nombre_combo = $_POST['nombre_combo'];
@@ -39,7 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 <div class="fade-in" style="max-width: 900px; margin: 0 auto;">
     <h2 class="page-title">Diseñador de Packs</h2>
-    <p style="color:#888;">Configura ofertas compuestas (Combos).</p>
     <?= $mensaje ?>
 
     <form method="POST" action="" id="formCombo">
@@ -56,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
             </div>
             <div>
-                <label style="color: #FFD700;">Precio Oferta ($)</label>
+                <label style="color: #FFD700;">Precio Oferta (S/)</label>
                 <input type="number" step="0.01" name="precio_venta" required placeholder="0.00" style="font-size:1.2rem; font-weight:bold;">
             </div>
         </div>
@@ -92,13 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody id="tabla_insumos">
-                        </tbody>
+                    <tbody id="tabla_insumos"></tbody>
                 </table>
-                <div id="empty-msg" style="text-align:center; padding:30px; color:#444;">
-                    <i class="fa-solid fa-basket-shopping" style="font-size:2rem; margin-bottom:10px;"></i>
-                    <p>No hay productos agregados aún</p>
-                </div>
             </div>
         </div>
 
@@ -121,11 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 break;
             }
         }
-
         if(idProducto === '') return;
-
-        // Ocultar mensaje vacío
-        document.getElementById('empty-msg').style.display = 'none';
 
         const tabla = document.getElementById('tabla_insumos');
         const fila = document.createElement('tr');
@@ -140,9 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <input type="hidden" name="insumo_cant[]" value="${cantidad}">
             </td>
             <td style="text-align:right;">
-                <button type="button" onclick="this.closest('tr').remove()" style="background:none; border:none; color:#ef5350; cursor:pointer; font-size:1.2rem;">
-                    <i class="fa-solid fa-times"></i>
-                </button>
+                <button type="button" onclick="this.closest('tr').remove()" style="background:none; border:none; color:#ef5350; cursor:pointer; font-size:1.2rem;"><i class="fa-solid fa-times"></i></button>
             </td>
         `;
         tabla.appendChild(fila);
@@ -150,5 +137,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         document.getElementById('input_producto').focus();
     }
 </script>
-
 <?php include '../../includes/footer_admin.php'; ?>

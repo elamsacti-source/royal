@@ -1,13 +1,14 @@
 <?php
+// royal/modulos/admin/productos_lista.php
 require_once '../../config/db.php';
 include '../../includes/header_admin.php';
 
-// 1. OBTENER TODAS LAS SEDES PARA LAS COLUMNAS
 $stmtSedes = $pdo->query("SELECT id, nombre FROM sedes ORDER BY id ASC");
 $sedes = $stmtSedes->fetchAll();
 
-// 2. CONSULTA DINÁMICA DE PRODUCTOS + STOCK POR SEDE
+// AGREGAMOS precio_caja Y unidades_caja A LA CONSULTA
 $sql = "SELECT p.id, p.codigo_barras, p.nombre, p.precio_venta, p.es_combo, p.categoria,
+        p.precio_caja, p.unidades_caja,
         (SELECT SUM(stock) FROM productos_sedes WHERE id_producto = p.id) as stock_total
         FROM productos p 
         ORDER BY p.nombre ASC";
@@ -18,14 +19,14 @@ $productos = $pdo->query($sql)->fetchAll();
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
         <div>
             <h2 class="page-title">Inventario Global</h2>
-            <p style="color:#888;">Vista panorámica de stock en todas las sucursales.</p>
+            <p style="color:#888;">Vista panorámica de stock y precios.</p>
         </div>
         <div style="display:flex; gap:10px;">
             <a href="sedes.php" class="btn-royal" style="background:#333; color:#fff; width:auto; font-size:0.9rem;">
-                <i class="fa-solid fa-store"></i> Gestionar Sedes
+                <i class="fa-solid fa-store"></i> Sedes
             </a>
             <a href="productos_nuevo.php" class="btn-royal" style="width:auto; font-size:0.9rem;">
-                <i class="fa-solid fa-plus"></i> Nuevo Item
+                <i class="fa-solid fa-plus"></i> Nuevo
             </a>
         </div>
     </div>
@@ -46,7 +47,7 @@ $productos = $pdo->query($sql)->fetchAll();
                     <?php foreach($sedes as $s): ?>
                         <th style="color:var(--royal-gold);"><?= $s['nombre'] ?></th>
                     <?php endforeach; ?>
-                    <th>Precio</th>
+                    <th>Precios (S/)</th>
                 </tr>
             </thead>
             <tbody>
@@ -64,8 +65,6 @@ $productos = $pdo->query($sql)->fetchAll();
 
                         <?php foreach($sedes as $s): ?>
                             <?php
-                                // Consultamos el stock específico de este producto en esta sede
-                                // (Idealmente esto se optimiza en la query principal, pero para claridad lo hacemos aquí)
                                 $stmtStock = $pdo->prepare("SELECT stock FROM productos_sedes WHERE id_producto = ? AND id_sede = ?");
                                 $stmtStock->execute([$p['id'], $s['id']]);
                                 $stockSede = $stmtStock->fetchColumn() ?: 0;
@@ -76,7 +75,15 @@ $productos = $pdo->query($sql)->fetchAll();
                             </td>
                         <?php endforeach; ?>
 
-                        <td>$<?= number_format($p['precio_venta'], 2) ?></td>
+                        <td>
+                            <div style="font-weight:bold; color:#fff;">S/ <?= number_format($p['precio_venta'], 2) ?></div>
+                            
+                            <?php if($p['unidades_caja'] > 1): ?>
+                                <div style="font-size:0.75rem; color:#FFD700; margin-top:2px;">
+                                    <i class="fa-solid fa-box"></i> x<?= $p['unidades_caja'] ?>: S/ <?= number_format($p['precio_caja'], 2) ?>
+                                </div>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -87,8 +94,7 @@ $productos = $pdo->query($sql)->fetchAll();
 <script>
 document.getElementById('buscador').addEventListener('keyup', function() {
     let filtro = this.value.toLowerCase();
-    let filas = document.querySelectorAll('#tablaProductos tbody tr');
-    filas.forEach(fila => {
+    document.querySelectorAll('#tablaProductos tbody tr').forEach(fila => {
         let texto = fila.innerText.toLowerCase();
         fila.style.display = texto.includes(filtro) ? '' : 'none';
     });
