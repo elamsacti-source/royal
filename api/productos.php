@@ -1,12 +1,14 @@
 <?php
+// royal/api/productos.php
 header('Content-Type: application/json');
 header("Access-Control-Allow-Origin: *");
 require_once '../config/db.php';
 
-// Configuración: ID de la Sede que hace Delivery (Por defecto 2)
+// Configuración: Sede Delivery
 $id_sede_delivery = 2; 
 
-$sql = "SELECT p.id, p.nombre, p.precio_venta, p.imagen, p.categoria, p.es_combo,
+// MODIFICADO: Agregamos precio_caja y unidades_caja
+$sql = "SELECT p.id, p.nombre, p.precio_venta, p.precio_caja, p.unidades_caja, p.imagen, p.categoria, p.es_combo,
         COALESCE(ps.stock, 0) as stock
         FROM productos p
         LEFT JOIN productos_sedes ps ON p.id = ps.id_producto AND ps.id_sede = ?
