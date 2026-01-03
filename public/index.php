@@ -1,536 +1,438 @@
 <?php
-// public/index.php
-session_start(); // 1. INICIO DE SESIÓN PARA DETECTAR CLIENTE
+session_start();
+require_once '../config/db.php';
+
+// Obtener ID de usuario
+$id_usuario = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0;
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Royal Delivery</title>
+    <title>Royal - Catálogo</title>
     
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Cinzel:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         /* =========================================
-           ESTILOS GENERALES (TEMA OSCURO PREMIUM)
-           ========================================= */
+           CORRECCIÓN Z-INDEX (SUPERIOR A TODO)
+        ========================================= */
+        .swal2-container {
+            z-index: 99999 !important; /* MÁS ALTO QUE EL CARRITO */
+        }
+
+        /* =========================================
+           ESTILO ROYAL DARK MOBILE PRO
+        ========================================= */
         :root {
             --bg-body: #050505;
-            --bg-card: #161616;
-            --royal-gold: #FFD700;
+            --bg-card: #141414;
+            --gold: #FFD700;
             --text-main: #ffffff;
             --text-muted: #888888;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body { 
             background-color: var(--bg-body); 
-            color: var(--text-main); 
-            font-family: 'Poppins', sans-serif; 
-            padding-bottom: 90px; 
-            -webkit-tap-highlight-color: transparent; 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; padding: 0;
+            color: var(--text-main);
+            padding-bottom: 100px; /* Espacio para el carrito */
         }
 
-        /* --- CONTENEDOR CENTRAL TIPO APP --- */
-        .app-container {
-            max-width: 500px;
-            margin: 0 auto;
-            background: var(--bg-body);
-            min-height: 100vh;
-            border-left: 1px solid #1a1a1a;
-            border-right: 1px solid #1a1a1a;
-        }
-
-        /* --- HEADER --- */
-        .header-web { 
-            background: rgba(22, 22, 22, 0.9); 
+        /* HEADER PREMIUM CON BOTONES CUADRADOS */
+        .royal-header {
+            background: rgba(15, 15, 15, 0.95);
             backdrop-filter: blur(10px);
-            padding: 15px 20px; 
-            position: sticky; top: 0; z-index: 100; 
-            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 20px;
+            position: sticky; top: 0; z-index: 1000;
             border-bottom: 1px solid #333;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .brand { 
+            font-family: 'Cinzel', serif; color: var(--gold); 
+            font-size: 1.5rem; text-decoration: none; 
+            display: flex; align-items: center; gap: 8px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
         }
 
-        .brand-logo { font-weight: 800; font-size: 1.2rem; letter-spacing: 1px; color: var(--text-main); }
-        .brand-logo i { color: var(--royal-gold); }
+        .header-actions { display: flex; gap: 10px; }
 
-        .btn-mis-pedidos {
-            font-size: 0.85rem; color: var(--text-muted); 
-            border: 1px solid #333; padding: 6px 12px; border-radius: 20px; 
-            cursor: pointer; transition: 0.3s; text-decoration: none;
-            display: flex; align-items: center; gap: 5px;
+        /* BOTONES DEL HEADER */
+        .btn-icon-header {
+            width: 40px; height: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #333;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 1.1rem;
+            text-decoration: none; transition: 0.3s;
         }
-        .btn-mis-pedidos:active, .btn-mis-pedidos:hover { background: #333; color: #fff; }
+        .btn-icon-header:active { transform: scale(0.95); background: var(--gold); color: #000; }
+        .btn-icon-header.moto { border-color: var(--gold); color: var(--gold); } 
 
-        /* --- BUSCADOR --- */
-        .search-container { padding: 20px; position: sticky; top: 60px; z-index: 90; background: var(--bg-body); }
-        .search-box { position: relative; width: 100%; }
-        .search-box input {
-            width: 100%; background: #222; border: 1px solid #333;
-            padding: 15px 15px 15px 45px; border-radius: 12px;
-            color: #fff; font-size: 1rem; font-family: 'Poppins', sans-serif;
+        /* BANNER */
+        .hero-mini {
+            text-align: center; padding: 25px 15px;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+            border-bottom: 1px solid #222; margin-bottom: 20px;
         }
-        .search-box input::placeholder { color: #555; }
-        .search-box i {
-            position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
-            color: var(--royal-gold);
-        }
+        .hero-mini h2 { font-family: 'Cinzel', serif; margin: 0; color: #fff; font-size: 1.6rem; }
+        .hero-mini p { color: var(--gold); font-size: 0.75rem; letter-spacing: 3px; text-transform: uppercase; margin: 5px 0 0; }
 
-        /* --- GRID DE PRODUCTOS --- */
-        .grid-productos { 
-            display: grid; grid-template-columns: repeat(2, 1fr); 
-            gap: 15px; padding: 0 20px;
+        /* BUSCADOR */
+        .search-container { padding: 0 15px; margin-bottom: 25px; }
+        .search-input {
+            width: 100%; background: #111; border: 1px solid #333;
+            padding: 15px 20px; border-radius: 12px; color: #fff; font-size: 1rem;
+            outline: none; transition: 0.3s;
         }
+        .search-input:focus { border-color: var(--gold); background: #1a1a1a; box-shadow: 0 0 15px rgba(255, 215, 0, 0.1); }
 
-        .card-prod {
-            background: var(--bg-card); border: 1px solid #2a2a2a;
-            border-radius: 15px; padding: 15px;
-            display: flex; flex-direction: column; justify-content: space-between;
-            height: 100%; cursor: pointer; position: relative; overflow: hidden;
-        }
-        .card-prod:active { transform: scale(0.98); border-color: var(--royal-gold); }
-
-        .tag-combo { 
-            position: absolute; top: 0; left: 0; font-size: 0.65rem; 
-            background: var(--royal-gold); color: #000; padding: 3px 8px; 
-            border-bottom-right-radius: 10px; font-weight: 800; 
-        }
-
-        .prod-icon { font-size: 2rem; color: #333; margin-bottom: 10px; text-align: center; }
-        .prod-nombre { 
-            color: #fff; font-weight: 500; font-size: 0.9rem; margin-bottom: 8px; 
-            line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; 
-            -webkit-box-orient: vertical; overflow: hidden;
-        }
+        /* GRID DE PRODUCTOS (CUADROS) */
+        .container { padding: 0 15px; max-width: 900px; margin: auto; }
         
-        .prod-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
-        .prod-precio { color: var(--royal-gold); font-size: 1.1rem; font-weight: 700; }
-        .btn-add { 
-            background: #222; color: #fff; width: 30px; height: 30px; 
-            border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 Columnas en celular */
+            gap: 15px;
         }
+        @media (min-width: 768px) { .product-grid { grid-template-columns: repeat(4, 1fr); } }
 
-        /* --- BOTÓN FLOTANTE --- */
-        .btn-flotante { 
-            position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); 
-            width: 90%; max-width: 460px;
-            background: linear-gradient(135deg, #FFD700 0%, #FFA000 100%); 
-            color: #000; padding: 16px; border-radius: 50px; 
-            font-weight: 800; text-align: center; 
-            box-shadow: 0 10px 25px rgba(255, 193, 7, 0.3); 
-            z-index: 200; display: none; font-size: 1rem; cursor: pointer;
+        /* TARJETA DE PRODUCTO */
+        .prod-card {
+            background: var(--bg-card);
+            border: 1px solid #222;
+            border-radius: 16px;
+            padding: 15px;
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+            position: relative; overflow: hidden;
+            transition: transform 0.2s, border-color 0.2s;
+            height: 100%;
         }
-
-        /* --- MODALES --- */
-        .modal-bg { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index: 300; justify-content:center; align-items:flex-end; backdrop-filter: blur(5px); }
-        .modal-caja { background: #111; width: 100%; max-width: 500px; border-radius: 20px 20px 0 0; border-top: 1px solid #333; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 -5px 30px rgba(0,0,0,0.5); }
-        .modal-body { padding: 25px; overflow-y: auto; }
+        .prod-card:active { transform: scale(0.96); background: #1a1a1a; }
         
-        .form-control { width: 100%; padding: 15px; background: #222; border: 1px solid #333; color: #fff; border-radius: 12px; margin-bottom: 12px; font-size: 1rem; }
-        .form-control:focus { border-color: var(--royal-gold); }
+        .prod-icon-area {
+            height: 80px; width: 80px;
+            background: radial-gradient(circle, #222 0%, transparent 70%);
+            border-radius: 50%; margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5rem; color: #444; transition: 0.3s;
+        }
+        .prod-card:hover .prod-icon-area { color: var(--gold); transform: scale(1.1); }
 
-        .btn-royal { width: 100%; border:none; padding: 18px; font-size:1rem; background: var(--royal-gold); color:#000; font-weight:800; border-radius:12px; cursor:pointer; text-transform: uppercase; }
+        .prod-cat { font-size: 0.6rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .prod-title { font-weight: 600; font-size: 0.95rem; line-height: 1.3; color: #eee; margin-bottom: 8px; flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .prod-price { color: var(--gold); font-weight: 800; font-size: 1.2rem; margin-bottom: 12px; }
 
-        /* --- MAPA MODAL --- */
-        #modal-mapa { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; background: #000; }
-        #map-selector { width: 100%; height: 85vh; }
-        .map-footer { height: 15vh; background: #111; padding: 15px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #333; }
+        .btn-add-card {
+            width: 100%; background: #222; border: 1px solid #333; color: #fff;
+            padding: 10px; border-radius: 8px; font-weight: bold; font-size: 0.8rem;
+            cursor: pointer; transition: 0.2s; text-transform: uppercase;
+        }
+        .btn-add-card:active { background: var(--gold); color: #000; border-color: var(--gold); }
 
-        .msg-loading { text-align:center; padding: 50px; color:#444; }
+        /* CARRITO FLOTANTE */
+        .floating-cart {
+            position: fixed; bottom: 25px; right: 20px;
+            background: var(--gold); color: #000;
+            padding: 12px 25px; border-radius: 50px;
+            font-weight: 800; font-size: 1rem;
+            box-shadow: 0 5px 25px rgba(255, 215, 0, 0.4);
+            cursor: pointer; z-index: 2000; display: flex; align-items: center; gap: 10px;
+            transition: transform 0.2s;
+        }
+        .floating-cart:active { transform: scale(0.9); }
+
+        /* MODAL CARRITO */
+        .cart-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 3000;
+            display: none; flex-direction: column;
+        }
+        .cart-content {
+            background: #111; flex: 1; display: flex; flex-direction: column;
+            margin-top: 40px; border-radius: 20px 20px 0 0; border-top: 2px solid var(--gold);
+            animation: slideUp 0.3s;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .cart-header { padding: 20px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        .cart-body { flex: 1; overflow-y: auto; padding: 20px; }
+        .cart-footer { padding: 20px; background: #080808; border-top: 1px solid #222; }
+
+        .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px dashed #333; padding-bottom: 10px; }
+        .qty-control { display: flex; gap: 10px; align-items: center; background: #222; padding: 5px 10px; border-radius: 20px; }
+
+        /* Formulario */
+        .form-control { width: 100%; padding: 14px; background: #1a1a1a; border: 1px solid #333; color: #fff; border-radius: 8px; margin-bottom: 12px; outline: none; }
+        .btn-main { width: 100%; background: linear-gradient(45deg, var(--gold), #b7892b); color: #000; padding: 16px; border: none; border-radius: 10px; font-weight: bold; font-size: 1.1rem; text-transform: uppercase; cursor: pointer; }
+
+        /* Campo Dirección Readonly */
+        .input-dir-readonly { background: #0f2213; border: 1px dashed var(--gold); color: var(--gold); cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    
-    <div class="header-web">
-        <div class="brand-logo">ROYAL <i class="fa-solid fa-wine-glass"></i></div>
+    <header class="royal-header">
+        <a href="index.php" class="brand"><i class="fa-solid fa-wine-bottle"></i> ROYAL</a>
         
-        <?php if(isset($_SESSION['user_id'])): ?>
-            <a href="mis_pedidos.php" class="btn-mis-pedidos">
-                <i class="fa-solid fa-user-check"></i> Hola, <?= explode(' ', $_SESSION['nombre'])[0] ?>
-            </a>
-        <?php else: ?>
-            <a href="../index.php" class="btn-mis-pedidos">
-                <i class="fa-solid fa-arrow-right-to-bracket"></i> Entrar
-            </a>
-        <?php endif; ?>
+        <div class="header-actions">
+            <?php if($id_usuario > 0): ?>
+                
+                <a href="mis_pedidos.php" class="btn-icon-header moto" title="Historial de Pedidos">
+                    <i class="fa-solid fa-motorcycle"></i>
+                </a>
+                
+                <a href="direcciones.php" class="btn-icon-header" title="Mis Direcciones">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </a>
+                
+                <a href="../logout.php" class="btn-icon-header" style="color:#ef5350; border-color:#552222;">
+                    <i class="fa-solid fa-power-off"></i>
+                </a>
+            <?php else: ?>
+                <a href="../index.php" class="btn-icon-header">
+                    <i class="fa-regular fa-user"></i>
+                </a>
+            <?php endif; ?>
+        </div>
+    </header>
+
+    <div class="hero-mini">
+        <h2>CATÁLOGO DIGITAL</h2>
+        <p>Selecciona tus favoritos</p>
     </div>
 
-    <div class="search-container">
-        <div class="search-box">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="buscador" placeholder="¿Qué vas a tomar hoy?" autocomplete="off" onkeyup="filtrarProductos()">
+    <div class="container">
+        <div class="search-container">
+            <input type="text" id="buscador" class="search-input" placeholder="🔍 Buscar licor, cerveza...">
+        </div>
+
+        <div id="grid-productos" class="product-grid">
+            <div style="grid-column:1/-1; text-align:center; padding:50px; color:#666;">
+                <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+            </div>
         </div>
     </div>
 
-    <div id="lista-productos" class="grid-productos">
-        <div class="msg-loading">
-            <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2rem; margin-bottom: 15px;"></i><br>
-            Cargando la carta...
-        </div>
+    <div class="floating-cart" onclick="toggleCart()">
+        <i class="fa-solid fa-bag-shopping"></i> 
+        <span id="float-total">S/ 0.00</span>
     </div>
 
-</div>
-
-<div id="btn-carrito" class="btn-flotante" onclick="abrirCarrito()">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="background:#000; color:#fff; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;" id="cant-items">0</span>
-        <span>VER MI PEDIDO</span>
-        <span id="btn-total-preview">S/ 0.00</span>
-    </div>
-</div>
-
-<div id="modal-carrito" class="modal-bg">
-    <div class="modal-caja">
-        <div style="padding:20px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center;">
-            <h3 style="color:#fff; margin:0; font-size:1.2rem;">Tu Canasta</h3>
-            <div onclick="cerrarCarrito()" style="color:#555; cursor:pointer; font-size:1.5rem;"><i class="fa-solid fa-xmark"></i></div>
-        </div>
-        
-        <div class="modal-body">
-            <div id="items-carrito"></div>
-            
-            <div style="display:flex; justify-content:space-between; font-size:1.3rem; color:#fff; font-weight:800; margin: 20px 0; border-top: 1px dashed #333; padding-top: 20px;">
-                <span>Total</span>
-                <span id="txt-total" style="color:var(--royal-gold);">S/ 0.00</span>
+    <div class="cart-overlay" id="cartModal">
+        <div style="flex:1;" onclick="toggleCart()"></div>
+        <div class="cart-content">
+            <div class="cart-header">
+                <h3 style="color:#fff; margin:0;">Tu Pedido</h3>
+                <button onclick="toggleCart()" style="background:none; border:none; color:#fff; font-size:1.5rem;">&times;</button>
             </div>
             
-            <h4 style="color:#888; margin-bottom:15px; font-size:0.9rem; text-transform:uppercase;">Datos de Entrega</h4>
-            <form id="form-pedido" onsubmit="enviarPedido(event)">
-                
-                <?php 
-                    $nombrePre = isset($_SESSION['nombre']) ? $_SESSION['nombre'] : '';
-                    $telPre    = isset($_SESSION['telefono']) ? $_SESSION['telefono'] : ''; 
-                ?>
-                <input type="text" id="cli-nombre" placeholder="Tu Nombre" required class="form-control" value="<?= $nombrePre ?>">
-                <input type="tel" id="cli-telefono" placeholder="WhatsApp de contacto" required class="form-control" value="<?= $telPre ?>">
-                
-                <div style="display:flex; gap:10px; margin-bottom:10px;">
-                    <input type="text" id="cli-direccion" placeholder="Dirección exacta" required class="form-control" style="margin-bottom:0;">
-                </div>
-                
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
-                    <button type="button" onclick="obtenerUbicacionGPS()" style="background:#222; border:1px solid #444; color:#fff; padding:10px; border-radius:8px; cursor:pointer; font-size:0.8rem;">
-                        <i class="fa-solid fa-location-crosshairs"></i> Usar mi GPS
-                    </button>
-                    <button type="button" onclick="abrirMapaSelector()" style="background:#222; border:1px solid #FFD700; color:#FFD700; padding:10px; border-radius:8px; cursor:pointer; font-size:0.8rem;">
-                        <i class="fa-solid fa-map-location-dot"></i> Elegir en Mapa
-                    </button>
-                </div>
-                
-                <small id="status-gps" style="color:#66bb6a; display:none; margin-bottom:15px; margin-top:5px; font-size:0.8rem;">📍 Ubicación GPS detectada</small>
-                
-                <input type="hidden" id="cli-lat"><input type="hidden" id="cli-lon">
-                
-                <select id="cli-metodo" class="form-control" style="margin-top:15px;">
-                    <option value="Yape">Pago con Yape / Plin</option>
-                    <option value="Efectivo">Pago en Efectivo</option>
-                </select>
+            <div class="cart-body" id="cartItems"></div>
 
-                <button type="submit" class="btn-royal" style="margin-top:15px;">
-                    CONFIRMAR PEDIDO <i class="fa-solid fa-arrow-right"></i>
-                </button>
-            </form>
+            <div class="cart-footer">
+                <div style="display:flex; justify-content:space-between; font-size:1.2rem; font-weight:bold; margin-bottom:15px; color:#fff;">
+                    <span>TOTAL</span>
+                    <span style="color:var(--gold);" id="final-total">S/ 0.00</span>
+                </div>
+
+                <div id="checkout-box">
+                    <label style="color:#888; font-size:0.8rem; display:block; margin-bottom:5px;">DIRECCIÓN (GPS)</label>
+                    <div onclick="abrirAgenda()">
+                        <input type="text" id="cli_dir" class="form-control input-dir-readonly" placeholder="Seleccionar Ubicación..." readonly>
+                        <input type="hidden" id="cli_lat"><input type="hidden" id="cli_lon">
+                    </div>
+
+                    <input type="text" id="cli_nom" class="form-control" placeholder="Tu Nombre" value="<?= isset($_SESSION['nombre']) ? $_SESSION['nombre'] : '' ?>">
+                    <input type="tel" id="cli_tel" class="form-control" placeholder="Teléfono">
+                    <select id="cli_pago" class="form-control">
+                        <option value="Yape">Yape / Plin</option>
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Tarjeta">Tarjeta</option>
+                    </select>
+
+                    <button onclick="enviar()" class="btn-main">CONFIRMAR PEDIDO</button>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<div id="modal-mapa">
-    <div id="map-selector"></div>
-    <div class="map-footer">
-        <div style="color:#fff;">
-            <small style="color:#888;">Ubicación seleccionada</small><br>
-            <b style="color:#FFD700;">Mueve el pin rojo</b>
-        </div>
-        <button onclick="confirmarMapa()" class="btn-royal" style="width: auto; padding: 10px 20px;">
-            CONFIRMAR
-        </button>
-    </div>
-</div>
-
-<script>
-    let productos = [], carrito = [];
-
-    // Cargar productos al iniciar
-    window.onload = () => {
-        fetch('../api/productos.php')
+    <script>
+        let carrito = [];
+        let productos = [];
+        const userId = <?= $id_usuario ?>;
+        
+        // 1. Cargar Productos
+        fetch('../api/productos.php?action=listar_publico')
             .then(r => r.json())
-            .then(d => { 
-                productos = d; 
-                render(productos); 
-            })
-            .catch(e => {
-                document.getElementById('lista-productos').innerHTML = '<div class="msg-loading">Error de conexión.</div>';
+            .then(data => {
+                productos = data;
+                render(data);
             });
-    };
 
-    function filtrarProductos() {
-        let texto = document.getElementById('buscador').value.toLowerCase();
-        let filtrados = productos.filter(p => p.nombre.toLowerCase().includes(texto));
-        render(filtrados);
-    }
-
-    function render(lista) {
-        let div = document.getElementById('lista-productos'); 
-        div.innerHTML = '';
-        
-        if(lista.length === 0) { 
-            div.innerHTML = '<div class="msg-loading">No encontramos ese licor :(</div>'; 
-            return; 
-        }
-
-        lista.forEach(p => {
-            let packTag = p.es_combo == 1 ? '<div class="tag-combo">PACK</div>' : '';
-            let icono = 'fa-wine-bottle';
-            if(p.nombre.toLowerCase().includes('cerveza')) icono = 'fa-beer-mug-empty';
-            if(p.nombre.toLowerCase().includes('cigarro')) icono = 'fa-smoking';
-            if(p.nombre.toLowerCase().includes('hielo')) icono = 'fa-icicles';
+        function render(lista) {
+            const grid = document.getElementById('grid-productos');
+            grid.innerHTML = '';
             
-            let stockHtml = '';
-            if(p.es_combo == 0) {
-                if(p.stock > 5) stockHtml = `<span style="font-size:0.75rem; color:#444;">Stock disponible</span>`;
-                else if(p.stock > 0) stockHtml = `<span style="font-size:0.75rem; color:#FFD700;">¡Quedan ${p.stock}!</span>`;
-                else stockHtml = `<span style="font-size:0.75rem; color:#ef5350;">Agotado</span>`;
-            }
-
-            div.innerHTML += `
-                <div class="card-prod" onclick="agregar(${p.id})">
-                    ${packTag}
-                    <div class="prod-icon"><i class="fa-solid ${icono}"></i></div>
-                    <div class="prod-nombre">${p.nombre}</div>
-                    <div class="prod-footer">
-                        <div class="prod-precio">S/ ${parseFloat(p.precio_venta).toFixed(2)}</div>
-                        <div class="btn-add"><i class="fa-solid fa-plus"></i></div>
+            lista.forEach(p => {
+                // Icono dinámico según categoría
+                let icon = 'fa-wine-bottle';
+                if(p.categoria && p.categoria.includes('Cerveza')) icon = 'fa-beer-mug-empty';
+                if(p.categoria && p.categoria.includes('Whisky')) icon = 'fa-glass-water';
+                
+                grid.innerHTML += `
+                <div class="prod-card">
+                    <div class="prod-icon-area">
+                        <i class="fa-solid ${icon}"></i>
                     </div>
-                    <div style="margin-top:5px;">${stockHtml}</div>
+                    
+                    <div class="prod-cat">${p.categoria || 'Licor'}</div>
+                    <div class="prod-title">${p.nombre}</div>
+                    <div class="prod-price">S/ ${parseFloat(p.precio_venta).toFixed(2)}</div>
+                    
+                    <button class="btn-add-card" onclick="add(${p.id})">
+                        AGREGAR <i class="fa-solid fa-plus"></i>
+                    </button>
                 </div>`;
-        });
-    }
-
-    // --- LÓGICA DE CARRITO (Unidades/Cajas) ---
-    function agregar(id) {
-        let p = productos.find(x => x.id == id);
-        
-        if(p.stock <= 0 && p.es_combo == 0) return alert('Lo sentimos, producto agotado.');
-        
-        let ex = carrito.find(x => x.id == id);
-        
-        if(ex) {
-            // Validar stock sumando lo que ya se pidió
-            let factor = (ex.modo === 'caja') ? p.unidades_caja : 1;
-            let totalPedido = (ex.cantidad + 1) * factor;
-
-            if (p.es_combo == 0 && totalPedido > p.stock) {
-                return alert(`Stock insuficiente. Solo quedan ${p.stock} unidades.`);
-            }
-            ex.cantidad++;
-        } else {
-            // Nuevo item: por defecto Unidad
-            carrito.push({
-                id: p.id, 
-                nombre: p.nombre, 
-                precio_unitario: parseFloat(p.precio_venta),
-                precio_caja: parseFloat(p.precio_caja || 0),
-                unidades_caja: parseInt(p.unidades_caja || 1),
-                precio: parseFloat(p.precio_venta),
-                cantidad: 1,
-                es_combo: p.es_combo,
-                modo: 'unidad'
             });
         }
-        
-        if(navigator.vibrate) navigator.vibrate(50);
-        actualizarUI();
-    }
 
-    function actualizarUI() {
-        let cant = carrito.reduce((a, b) => a + b.cantidad, 0);
-        let total = carrito.reduce((a, b) => a + (b.precio * b.cantidad), 0);
+        // Buscador
+        document.getElementById('buscador').addEventListener('input', (e) => {
+            const t = e.target.value.toLowerCase();
+            render(productos.filter(p => p.nombre.toLowerCase().includes(t)));
+        });
 
-        document.getElementById('cant-items').innerText = cant;
-        document.getElementById('btn-total-preview').innerText = 'S/ ' + total.toFixed(2);
-        
-        let btn = document.getElementById('btn-carrito');
-        if(cant > 0) {
-            btn.style.display = 'block';
-        } else {
-            btn.style.display = 'none';
-            cerrarCarrito();
-        }
-    }
-
-    function abrirCarrito() {
-        let div = document.getElementById('items-carrito'), total = 0; div.innerHTML = '';
-        
-        carrito.forEach((i, x) => {
-            total += i.precio * i.cantidad;
+        // 2. Carrito
+        function add(id) {
+            const p = productos.find(x => x.id == id);
+            const ex = carrito.find(x => x.id == id);
+            if(ex) ex.cantidad++; else carrito.push({...p, cantidad:1});
+            updCart();
             
-            // Selector de Unidad/Caja si aplica
-            let selector = '';
-            if(i.unidades_caja > 1 && i.es_combo == 0) {
-                selector = `
-                <select onchange="cambiarModo(${x}, this.value)" style="background:#222; color:#FFD700; border:1px solid #444; padding:2px; border-radius:4px; font-size:0.8rem; margin-top:5px;">
-                    <option value="unidad" ${i.modo === 'unidad' ? 'selected' : ''}>Unidad</option>
-                    <option value="caja" ${i.modo === 'caja' ? 'selected' : ''}>Caja x${i.unidades_caja}</option>
-                </select>`;
-            }
+            // Animación botón flotante
+            const btn = document.querySelector('.floating-cart');
+            btn.style.transform = 'scale(1.2)';
+            setTimeout(()=>btn.style.transform='scale(1)', 200);
+        }
 
-            div.innerHTML += `
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:15px; border-bottom:1px solid #222; padding-bottom:15px;">
+        function updCart() {
+            const div = document.getElementById('cartItems');
+            div.innerHTML = '';
+            let total = 0;
+
+            carrito.forEach((p, i) => {
+                total += p.precio_venta * p.cantidad;
+                div.innerHTML += `
+                <div class="cart-item">
                     <div>
-                        <div style="color:#fff; font-weight:600;">${i.nombre}</div>
-                        <small style="color:#888;">${i.cantidad} x S/ ${i.precio.toFixed(2)}</small>
-                        <div>${selector}</div>
+                        <div style="color:#fff; font-size:0.9rem;">${p.nombre}</div>
+                        <small style="color:#666;">S/ ${p.precio_venta} x ${p.cantidad}</small>
                     </div>
-                    <div style="text-align:right;">
-                        <div style="color:#fff; font-weight:bold;">S/ ${(i.precio * i.cantidad).toFixed(2)}</div> 
-                        <small style="color:#ef5350; cursor:pointer; display:block; margin-top:5px;" onclick="eliminar(${x})">Eliminar</small>
+                    <div class="qty-control">
+                        <i class="fa-solid fa-minus" onclick="mod(${i},-1)" style="color:#888; cursor:pointer;"></i>
+                        <span style="color:#fff; font-weight:bold; min-width:20px; text-align:center;">${p.cantidad}</span>
+                        <i class="fa-solid fa-plus" onclick="mod(${i},1)" style="color:#fff; cursor:pointer;"></i>
                     </div>
                 </div>`;
-        });
-        document.getElementById('txt-total').innerText = 'S/ ' + total.toFixed(2);
-        document.getElementById('modal-carrito').style.display = 'flex';
-    }
+            });
 
-    function cambiarModo(index, nuevoModo) {
-        let item = carrito[index];
-        item.modo = nuevoModo;
-        
-        if(nuevoModo === 'caja') {
-            item.precio = (item.precio_caja > 0) ? item.precio_caja : (item.precio_unitario * item.unidades_caja);
-        } else {
-            item.precio = item.precio_unitario;
+            const txt = 'S/ ' + total.toFixed(2);
+            document.getElementById('float-total').innerText = txt;
+            document.getElementById('final-total').innerText = txt;
         }
-        
-        actualizarUI();
-        abrirCarrito();
-    }
 
-    function eliminar(idx) { carrito.splice(idx, 1); actualizarCarrito(); if(carrito.length>0) abrirCarrito(); }
-    function cerrarCarrito() { document.getElementById('modal-carrito').style.display = 'none'; }
-
-    // --- LÓGICA DE MAPA (LEAFLET) ---
-    let mapSel, markerSel;
-    
-    function abrirMapaSelector() {
-        document.getElementById('modal-mapa').style.display = 'block';
-        if(!mapSel) {
-            // Iniciar mapa en Lima por defecto
-            mapSel = L.map('map-selector').setView([-12.046, -77.042], 13);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapSel);
-            
-            // Icono personalizado (Pin Rojo)
-            const pinIcon = L.divIcon({
-                className: 'custom-div-icon',
-                html: `<div style='background:#ef5350; width:30px; height:30px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2px solid #fff;'></div>`,
-                iconSize: [30, 30], iconAnchor: [15, 30]
-            });
-            
-            markerSel = L.marker(mapSel.getCenter(), {draggable: true, icon: pinIcon}).addTo(mapSel);
-            
-            // Ir a GPS actual si es posible
-            navigator.geolocation.getCurrentPosition(pos => {
-                mapSel.setView([pos.coords.latitude, pos.coords.longitude], 16);
-                markerSel.setLatLng([pos.coords.latitude, pos.coords.longitude]);
-            });
-
-            // Mover pin al hacer click
-            mapSel.on('click', function(e) { markerSel.setLatLng(e.latlng); });
+        function mod(i, d) {
+            carrito[i].cantidad += d;
+            if(carrito[i].cantidad <= 0) carrito.splice(i,1);
+            updCart();
         }
-        setTimeout(() => { mapSel.invalidateSize(); }, 200);
-    }
 
-    function confirmarMapa() {
-        const pos = markerSel.getLatLng();
-        document.getElementById('cli-lat').value = pos.lat;
-        document.getElementById('cli-lon').value = pos.lng;
-        document.getElementById('status-gps').style.display = 'block';
-        document.getElementById('status-gps').innerText = "📍 Ubicación de mapa fijada";
-        document.getElementById('modal-mapa').style.display = 'none';
-        
-        // Autocompletar dirección
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.lat}&lon=${pos.lng}`)
-            .then(r=>r.json()).then(d => { 
-                if(d.display_name) document.getElementById('cli-direccion').value = d.display_name.split(',')[0]; 
-            });
-    }
+        function toggleCart() {
+            const m = document.getElementById('cartModal');
+            m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+        }
 
-    function obtenerUbicacionGPS() {
-        let btn = document.querySelector('button[onclick="obtenerUbicacionGPS()"]');
-        if(!navigator.geolocation) return alert('GPS no soportado.');
-        
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        
-        navigator.geolocation.getCurrentPosition(pos => {
-            document.getElementById('cli-lat').value = pos.coords.latitude;
-            document.getElementById('cli-lon').value = pos.coords.longitude;
-            document.getElementById('status-gps').style.display = 'block';
-            document.getElementById('status-gps').innerText = "📍 GPS Actual detectado";
+        // 3. Direcciones GPS
+        function abrirAgenda() {
+            if(userId == 0) return Swal.fire('Inicia Sesión', 'Debes ingresar para usar el GPS.', 'info').then(()=>location.href='../index.php');
+
+            Swal.fire({ title: 'Cargando...', didOpen: () => Swal.showLoading(), background:'#1a1a1a', color:'#fff' });
             
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`)
-            .then(r => r.json()).then(d => { 
-                document.getElementById('cli-direccion').value = d.display_name.split(',')[0];
-                btn.innerHTML = '<i class="fa-solid fa-check"></i> GPS Listo';
+            // Fix Z-Index SweetAlert
+            document.querySelector('.swal2-container').style.zIndex = '99999';
+
+            fetch('../api/direcciones.php?action=listar')
+                .then(r => r.json())
+                .then(d => {
+                    if (d.length === 0) {
+                        return Swal.fire({
+                            icon: 'info', title: 'Sin direcciones', text: 'Registra tu Casa o Trabajo.',
+                            confirmButtonText: 'Nueva Dirección', confirmButtonColor: '#FFD700', background:'#1a1a1a', color:'#fff'
+                        }).then((res) => { if(res.isConfirmed) location.href = 'direcciones.php'; });
+                    }
+                    
+                    let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+                    d.forEach(x => {
+                        let icon = x.etiqueta == 'Casa' ? 'fa-house' : 'fa-map-pin';
+                        html += `
+                        <div onclick="usarDir('${x.direccion}', '${x.lat}', '${x.lon}')" 
+                             style="background:#222; padding:12px; border-radius:10px; border:1px solid #333; cursor:pointer; text-align:left; display:flex; gap:12px; align-items:center;">
+                            <i class="fa-solid ${icon}" style="color:#FFD700; font-size:1.2rem;"></i>
+                            <div>
+                                <div style="font-weight:bold; color:#fff;">${x.etiqueta}</div>
+                                <div style="font-size:0.8rem; color:#aaa;">${x.direccion}</div>
+                            </div>
+                        </div>`;
+                    });
+                    html += '</div><br><a href="direcciones.php" style="color:#FFD700;">+ Agregar nueva</a>';
+
+                    Swal.fire({ title: 'Selecciona Ubicación', html: html, showConfirmButton: false, showCloseButton: true, background:'#111', color:'#fff' });
+                });
+        }
+
+        function usarDir(dir, lat, lon) {
+            document.getElementById('cli_dir').value = dir;
+            document.getElementById('cli_lat').value = lat;
+            document.getElementById('cli_lon').value = lon;
+            Swal.close();
+        }
+
+        // 4. Enviar
+        function enviar() {
+            const dir = document.getElementById('cli_dir').value;
+            const nom = document.getElementById('cli_nom').value;
+            const tel = document.getElementById('cli_tel').value;
+            
+            if(carrito.length===0) return Swal.fire('Carrito vacío','','warning');
+            if(!dir) return Swal.fire('Falta Dirección','Selecciona una ubicación.','warning');
+            if(!nom || !tel) return Swal.fire('Faltan Datos','Completa los campos.','warning');
+
+            Swal.showLoading();
+            const data = {
+                productos: carrito.map(p=>({id:p.id, cantidad:p.cantidad, precio:p.precio_venta})),
+                cliente: { nombre:nom, telefono:tel, direccion:dir, lat:document.getElementById('cli_lat').value, lon:document.getElementById('cli_lon').value },
+                metodo_pago: document.getElementById('cli_pago').value,
+                total: document.getElementById('final-total').innerText.replace('S/ ','')
+            };
+
+            fetch('../api/pedido.php', {
+                method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+            }).then(r=>r.json()).then(res => {
+                if(res.success) {
+                    carrito=[]; updCart(); toggleCart();
+                    Swal.fire({icon:'success', title:'¡Pedido Enviado!', text:'Driver notificado.', confirmButtonColor:'#FFD700', background:'#1a1a1a', color:'#fff'})
+                    .then(() => location.href=`track.php?id=${res.id_pedido}`);
+                } else Swal.fire('Error', res.message, 'error');
             });
-        }, err => {
-            alert('Error al obtener GPS.');
-            btn.innerHTML = 'Reintentar GPS';
-        }, { enableHighAccuracy: true });
-    }
-
-    // --- ENVIAR PEDIDO ---
-    // Inyectamos ID de sesión desde PHP
-    const idUsuarioSesion = <?= isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'null' ?>;
-
-    function enviarPedido(e) {
-        e.preventDefault();
-        let btn = document.querySelector('#form-pedido button[type="submit"]');
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ENVIANDO...';
-        btn.disabled = true;
-
-        let total = carrito.reduce((a, b) => a + (b.precio * b.cantidad), 0);
-        let datos = {
-            carrito, 
-            total, 
-            metodo: document.getElementById('cli-metodo').value,
-            id_cliente: idUsuarioSesion, // Enviamos ID para historial
-            cliente: {
-                nombre: document.getElementById('cli-nombre').value, 
-                telefono: document.getElementById('cli-telefono').value,
-                direccion: document.getElementById('cli-direccion').value, 
-                lat: document.getElementById('cli-lat').value, 
-                lon: document.getElementById('cli-lon').value
-            }
-        };
-        
-        fetch('../api/pedido.php', { method: 'POST', body: JSON.stringify(datos) })
-        .then(r => r.json())
-        .then(d => {
-            if(d.success) {
-                if(confirm('✅ PEDIDO ENVIADO.\n\n¿Quieres ver el seguimiento en tiempo real?')) {
-                    window.location.href = 'track.php?id=' + d.id_pedido;
-                } else {
-                    location.reload();
-                }
-            } else {
-                alert('Error: ' + d.message);
-                btn.innerHTML = 'INTENTAR NUEVAMENTE';
-                btn.disabled = false;
-            }
-        })
-        .catch(err => {
-            alert('Error de conexión.');
-            btn.innerHTML = 'INTENTAR NUEVAMENTE';
-            btn.disabled = false;
-        });
-    }
-</script>
+        }
+    </script>
 </body>
 </html>

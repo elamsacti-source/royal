@@ -10,63 +10,56 @@ include '../../includes/header_admin.php';
 $mensaje = "";
 
 // ---------------------------------------------------------
-// LÓGICA DE PROCESAMIENTO
+// LÓGICA DE PROCESAMIENTO (SIMPLIFICADA E INTELIGENTE)
 // ---------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $sede_origen = $_POST['sede_origen'];
     $tipo_op     = $_POST['tipo_operacion']; 
     $prod_id     = $_POST['producto'];
     
-    // Novedades: Precio Venta y Unidades/Cajas
-    $precio_venta_nuevo = isset($_POST['precio_venta']) ? (float) $_POST['precio_venta'] : 0;
+    // Datos del formulario
+    $unidad_medida  = $_POST['unidad_medida']; // 'unidad' o 'caja'
+    $cant_ingresada = (float) $_POST['cantidad'];
     
-    $unidad_medida      = $_POST['unidad_medida'] ?? 'unidad'; // 'unidad' o 'caja'
-    $cant_ingresada     = (float) $_POST['cantidad'];
-    $unidades_por_caja  = (float) ($_POST['unidades_por_caja'] ?? 1);
-    
-    // Costo ingresado (puede ser por caja o por unidad según la selección)
-    $costo_input = isset($_POST['costo']) ? (float) $_POST['costo'] : 0;
-    
-    $sede_destino = isset($_POST['sede_destino']) ? $_POST['sede_destino'] : null;
+    // Nuevos datos opcionales
+    $costo_input    = isset($_POST['costo']) ? (float) $_POST['costo'] : 0;
+    $precio_venta   = isset($_POST['precio_venta']) ? (float) $_POST['precio_venta'] : 0;
+    $sede_destino   = $_POST['sede_destino'] ?? null;
 
-    // --- 1. CONVERSIÓN DE CAJAS A UNIDADES ---
-    // El sistema siempre guarda unidades en la BD.
-    if ($unidad_medida == 'caja') {
-        if ($unidades_por_caja <= 0) $unidades_por_caja = 1; // Evitar división por cero
-        
-        $cantidad_real = $cant_ingresada * $unidades_por_caja; // Ej: 2 cajas * 12 = 24 unidades
-        
-        // Si ingresó costo, se asume que es el Costo POR CAJA. Lo convertimos a unitario.
-        $costo_unitario_real = ($costo_input > 0) ? ($costo_input / $unidades_por_caja) : 0;
-    } else {
-        $cantidad_real = $cant_ingresada;
-        $costo_unitario_real = $costo_input;
-    }
-
-    // Validaciones
-    if ($cantidad_real <= 0) {
-        $mensaje = "<div class='alert alert-error'>⚠️ La cantidad total debe ser mayor a 0.</div>";
-    } elseif ($tipo_op == 'transferencia' && $sede_origen == $sede_destino) {
-        $mensaje = "<div class='alert alert-error'>⚠️ El origen y destino no pueden ser iguales.</div>";
-    } elseif (empty($tipo_op)) {
-        $mensaje = "<div class='alert alert-error'>⚠️ Selecciona un tipo de operación.</div>";
+    if ($cant_ingresada <= 0) {
+        $mensaje = "<div class='alert alert-error'>⚠️ La cantidad debe ser mayor a 0.</div>";
     } else {
         try {
             $pdo->beginTransaction();
 
-            // 2. DATOS PREVIOS
-            $stmtProd = $pdo->prepare("SELECT costo_compra, precio_venta FROM productos WHERE id = ?");
+            // 1. OBTENER DATOS REALES DEL PRODUCTO (FACTOR DE CAJA)
+            // Consultamos la BD para evitar errores humanos en el formulario
+            $stmtProd = $pdo->prepare("SELECT costo_compra, precio_venta, unidades_caja FROM productos WHERE id = ?");
             $stmtProd->execute([$prod_id]);
             $prodData = $stmtProd->fetch();
-            $costoAntiguoBD = $prodData['costo_compra'];
+            
+            // Factor automático (si es 0 o null, asumimos 1)
+            $factor_conversion = ($prodData['unidades_caja'] > 0) ? $prodData['unidades_caja'] : 1;
+            $costoAntiguoBD    = $prodData['costo_compra'];
 
-            // 3. ACTUALIZAR PRECIO DE VENTA (Si el usuario lo ingresó)
-            // Solo actualizamos si es mayor a 0, para no borrar precios por accidente
-            if ($precio_venta_nuevo > 0) {
-                $pdo->prepare("UPDATE productos SET precio_venta = ? WHERE id = ?")->execute([$precio_venta_nuevo, $prod_id]);
+            // 2. CALCULAR CANTIDAD REAL EN UNIDADES (BOTELLAS)
+            if ($unidad_medida == 'caja') {
+                $cantidad_real = $cant_ingresada * $factor_conversion; 
+                // Si ingresó costo, asumimos que es el COSTO DE LA CAJA, así que dividimos
+                $costo_unitario_real = ($costo_input > 0) ? ($costo_input / $factor_conversion) : 0;
+                $nota_extra = " ($cant_ingresada Cajas x $factor_conversion u)";
+            } else {
+                $cantidad_real = $cant_ingresada;
+                $costo_unitario_real = $costo_input;
+                $nota_extra = "";
             }
 
-            // 4. VALIDAR STOCK ORIGEN
+            // 3. ACTUALIZAR PRECIO DE VENTA (Si el usuario lo ingresó)
+            if ($precio_venta > 0) {
+                $pdo->prepare("UPDATE productos SET precio_venta = ? WHERE id = ?")->execute([$precio_venta, $prod_id]);
+            }
+
+            // 4. VALIDAR STOCK PARA SALIDAS
             $es_ingreso = ($tipo_op == 'cargo_compra' || $tipo_op == 'cargo_ajuste');
             
             $stmtStock = $pdo->prepare("SELECT stock FROM productos_sedes WHERE id_producto = ? AND id_sede = ? FOR UPDATE");
@@ -75,12 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stockOrigen = $stockData ? (float)$stockData['stock'] : 0;
 
             if (!$es_ingreso && $stockOrigen < $cantidad_real) {
-                throw new Exception("Stock insuficiente en origen. Tienes $stockOrigen unidades (intentas sacar $cantidad_real).");
+                throw new Exception("Stock insuficiente. Tienes $stockOrigen botellas, intentas sacar $cantidad_real.");
             }
 
-            // 5. PROCESAR SEGÚN TIPO
+            // 5. ACTUALIZAR COSTO PROMEDIO (SOLO EN COMPRAS)
+            $costoParaKardex = $costoAntiguoBD; // Por defecto mantenemos el anterior
+            
             if ($tipo_op == 'cargo_compra') {
-                // Recalcular Costo Promedio
                 $stmtGlobal = $pdo->prepare("SELECT SUM(stock) FROM productos_sedes WHERE id_producto = ?");
                 $stmtGlobal->execute([$prod_id]);
                 $stockGlobal = $stmtGlobal->fetchColumn() ?: 0;
@@ -88,98 +82,80 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $valorAnt = $stockGlobal * $costoAntiguoBD;
                 $valorNue = $cantidad_real * $costo_unitario_real;
                 
-                $divisor = $stockGlobal + $cantidad_real;
-                $nuevoCostoPromedio = ($divisor > 0) ? ($valorAnt + $valorNue) / $divisor : $costo_unitario_real;
+                $nuevoCostoPromedio = ($stockGlobal + $cantidad_real > 0) 
+                                      ? ($valorAnt + $valorNue) / ($stockGlobal + $cantidad_real) 
+                                      : $costo_unitario_real;
 
                 $pdo->prepare("UPDATE productos SET costo_compra = ? WHERE id = ?")->execute([$nuevoCostoPromedio, $prod_id]);
-                
-                // Para el Kardex usamos el costo REAL de esta compra
-                $costoParaKardex = $costo_unitario_real;
-            } else {
-                // Para otros movimientos, usamos el costo que ya tenía el producto
-                $costoParaKardex = $costoAntiguoBD;
+                $costoParaKardex = $costo_unitario_real; // En el kardex registramos el costo de ESTA compra
             }
 
+            // 6. EJECUTAR MOVIMIENTO
             if ($tipo_op == 'transferencia') {
-                // A. Restar Origen
-                $pdo->prepare("UPDATE productos_sedes SET stock = stock - ? WHERE id_producto = ? AND id_sede = ?")->execute([$cantidad_real, $prod_id, $sede_origen]);
-                
-                // B. Sumar Destino
-                $checkDest = $pdo->prepare("SELECT id FROM productos_sedes WHERE id_producto = ? AND id_sede = ?");
-                $checkDest->execute([$prod_id, $sede_destino]);
-                if (!$checkDest->fetch()) {
-                    $pdo->prepare("INSERT INTO productos_sedes (id_producto, id_sede, stock) VALUES (?, ?, 0)")->execute([$prod_id, $sede_destino]);
-                }
-                $pdo->prepare("UPDATE productos_sedes SET stock = stock + ? WHERE id_producto = ? AND id_sede = ?")->execute([$cantidad_real, $prod_id, $sede_destino]);
+                // Restar Origen
+                movimientoStock($pdo, $prod_id, $sede_origen, -$cantidad_real);
+                // Sumar Destino
+                movimientoStock($pdo, $prod_id, $sede_destino, $cantidad_real);
 
-                // Registrar Cabecera Transferencia
-                $sqlTrans = "INSERT INTO transferencias (origen_sede_id, destino_sede_id, id_usuario, fecha, estado) VALUES (?, ?, ?, NOW(), 'completado')";
-                $pdo->prepare($sqlTrans)->execute([$sede_origen, $sede_destino, $_SESSION['user_id']]);
+                // Registrar Transferencia
+                $pdo->prepare("INSERT INTO transferencias (origen_sede_id, destino_sede_id, id_producto, cantidad, id_usuario, fecha) VALUES (?, ?, ?, ?, ?, NOW())")
+                    ->execute([$sede_origen, $sede_destino, $prod_id, $cantidad_real, $_SESSION['user_id']]);
                 $id_trans = $pdo->lastInsertId();
 
-                // Registrar Detalle
-                $pdo->prepare("INSERT INTO transferencias_detalle (id_transferencia, id_producto, cantidad) VALUES (?, ?, ?)")
-                    ->execute([$id_trans, $prod_id, $cantidad_real]);
+                registrarKardex($pdo, $prod_id, $sede_origen, 'transferencia_salida', -$cantidad_real, $costoParaKardex, "TRF #$id_trans a Sede #$sede_destino" . $nota_extra);
+                registrarKardex($pdo, $prod_id, $sede_destino, 'transferencia_entrada', $cantidad_real, $costoParaKardex, "TRF #$id_trans desde Sede #$sede_origen" . $nota_extra);
                 
-                // Kardex
-                $notaK = ($unidad_medida == 'caja') ? "TRF ($cant_ingresada Cajas)" : "TRF Manual";
-                registrarKardex($pdo, $prod_id, $sede_origen, 'transferencia_salida', -$cantidad_real, $costoParaKardex, "$notaK a Sede #$sede_destino");
-                registrarKardex($pdo, $prod_id, $sede_destino, 'transferencia_entrada', $cantidad_real, $costoParaKardex, "$notaK desde Sede #$sede_origen");
-
             } else {
-                // Operación Simple (Compra, Ajuste, Merma)
+                // Movimiento Simple
                 $factor = $es_ingreso ? 1 : -1;
+                movimientoStock($pdo, $prod_id, $sede_origen, $cantidad_real * $factor);
                 
-                if ($es_ingreso && !$stockData) {
-                    $pdo->prepare("INSERT INTO productos_sedes (id_producto, id_sede, stock) VALUES (?, ?, 0)")->execute([$prod_id, $sede_origen]);
-                }
-
-                $pdo->prepare("UPDATE productos_sedes SET stock = stock + ? WHERE id_producto = ? AND id_sede = ?")->execute([$cantidad_real * $factor, $prod_id, $sede_origen]);
-
-                $notaMap = [
-                    'cargo_compra' => 'Compra de Mercadería',
-                    'cargo_ajuste' => 'Ajuste (Sobrante)',
-                    'descargo_ajuste' => 'Ajuste (Faltante)',
-                    'descargo_merma' => 'Baja por Merma/Deterioro'
+                $labels = [
+                    'cargo_compra' => 'Compra', 'cargo_ajuste' => 'Sobrante',
+                    'descargo_merma' => 'Merma', 'descargo_ajuste' => 'Faltante'
                 ];
-                $baseNota = $notaMap[$tipo_op] ?? 'Movimiento';
-                // Agregamos detalle a la nota si fue por caja
-                if($unidad_medida == 'caja') {
-                    $baseNota .= " ($cant_ingresada Cajas x $unidades_por_caja u)";
-                }
+                $nota = ($labels[$tipo_op] ?? 'Ajuste') . $nota_extra;
                 
-                registrarKardex($pdo, $prod_id, $sede_origen, $tipo_op, $cantidad_real * $factor, $costoParaKardex, $baseNota);
+                registrarKardex($pdo, $prod_id, $sede_origen, $tipo_op, $cantidad_real * $factor, $costoParaKardex, $nota);
             }
 
             $pdo->commit();
-            $mensaje = "<div class='alert alert-success'>✅ Operación registrada correctamente.<br>Stock actualizado: <b>$cantidad_real unidades</b>.</div>";
+            $mensaje = "<div class='alert alert-success'>✅ Operación exitosa.<br>Se procesaron <b>$cantidad_real botellas</b>.</div>";
 
         } catch (Exception $e) {
             $pdo->rollBack();
-            $mensaje = "<div class='alert alert-error'>❌ Error: " . $e->getMessage() . "</div>";
+            $mensaje = "<div class='alert alert-error'>❌ " . $e->getMessage() . "</div>";
         }
     }
 }
 
-function registrarKardex($pdo, $prod, $sede, $tipo, $cant, $costo, $nota) {
-    $stmt = $pdo->prepare("SELECT stock FROM productos_sedes WHERE id_producto = ? AND id_sede = ?");
-    $stmt->execute([$prod, $sede]);
-    $saldo = $stmt->fetchColumn();
+// Funciones auxiliares
+function movimientoStock($pdo, $prod, $sede, $cant) {
+    $check = $pdo->prepare("SELECT id FROM productos_sedes WHERE id_producto = ? AND id_sede = ?");
+    $check->execute([$prod, $sede]);
+    if (!$check->fetch()) {
+        $pdo->prepare("INSERT INTO productos_sedes (id_producto, id_sede, stock) VALUES (?, ?, 0)")->execute([$prod, $sede]);
+    }
+    $pdo->prepare("UPDATE productos_sedes SET stock = stock + ? WHERE id_producto = ? AND id_sede = ?")->execute([$cant, $prod, $sede]);
+}
 
-    $sql = "INSERT INTO kardex (id_producto, id_sede, tipo_movimiento, cantidad, costo_unitario, costo_total, stock_resultante, nota, fecha) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+function registrarKardex($pdo, $prod, $sede, $tipo, $cant, $costo, $nota) {
+    $saldo = $pdo->query("SELECT stock FROM productos_sedes WHERE id_producto=$prod AND id_sede=$sede")->fetchColumn();
+    $sql = "INSERT INTO kardex (id_producto, id_sede, tipo_movimiento, cantidad, costo_unitario, costo_total, stock_resultante, nota, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
     $pdo->prepare($sql)->execute([$prod, $sede, $tipo, $cant, $costo, abs($cant * $costo), $saldo, $nota]);
 }
 
+// CARGA DE DATOS PARA JS
 $sedes = $pdo->query("SELECT * FROM sedes")->fetchAll();
-$productos = $pdo->query("SELECT id, nombre, costo_compra, precio_venta FROM productos ORDER BY nombre")->fetchAll();
-// Preparamos JSON para JS
+$productos = $pdo->query("SELECT id, nombre, costo_compra, precio_venta, unidades_caja FROM productos ORDER BY nombre")->fetchAll();
+
 $prodJson = [];
 foreach($productos as $p) {
     $prodJson[$p['id']] = [
-        'nombre'=>$p['nombre'], 
-        'costo'=>$p['costo_compra'],
-        'venta'=>$p['precio_venta']
+        'nombre' => $p['nombre'], 
+        'costo'  => $p['costo_compra'],
+        'venta'  => $p['precio_venta'],
+        'factor' => $p['unidades_caja'] // Dato clave para el JS
     ];
 }
 ?>
@@ -198,7 +174,7 @@ foreach($productos as $p) {
     .alert-success { background: rgba(46, 125, 50, 0.2); color: #81c784; border: 1px solid #2e7d32; }
     .alert-error { background: rgba(198, 40, 40, 0.2); color: #e57373; border: 1px solid #c62828; }
 
-    /* Grid Botones */
+    /* Grid Botones (Tu diseño original) */
     .op-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 25px; }
     .op-card { background: #111; border: 2px solid #333; border-radius: 10px; padding: 20px 10px; text-align: center; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 120px; }
     .op-card:hover { background: #222; border-color: #555; }
@@ -209,9 +185,13 @@ foreach($productos as $p) {
     .op-card.active .op-title { color: #fff; }
 
     .section-label { color: #888; font-size: 0.85rem; margin-bottom: 8px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
-    
     .input-group-row { display: flex; gap: 15px; }
-    @media(max-width: 600px) { .input-group-row { flex-direction: column; gap: 0; } }
+    
+    /* Etiqueta de Conversión Dinámica */
+    .conversion-tag {
+        background: rgba(255, 215, 0, 0.1); border: 1px solid var(--royal-gold); color: var(--royal-gold);
+        padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px; display: none;
+    }
 </style>
 
 <div class="fade-in" style="max-width:800px; margin:auto; padding-top:20px;">
@@ -283,36 +263,31 @@ foreach($productos as $p) {
                             <option value="<?= $p['id'] ?>"><?= $p['nombre'] ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <div id="info_costo" style="display:none; font-size:0.9rem; color:#888; text-align:right;">
-                        Costo Actual (Unid): <b style="color:#fff;" id="txt_costo">S/ 0.00</b> | 
-                        P. Venta: <b style="color:var(--royal-gold);" id="txt_venta">S/ 0.00</b>
+                    <div id="info_extra" style="display:none; font-size:0.9rem; color:#888; text-align:right;">
+                        Contenido Caja: <b style="color:#fff;" id="txt_factor">1 Unid</b> | 
+                        Costo Actual: <b style="color:#fff;" id="txt_costo">S/ 0.00</b>
                     </div>
                 </div>
 
                 <div class="input-group-row" style="margin-bottom:15px; background: #222; padding:15px; border-radius:8px;">
                     <div style="flex:1;">
-                        <span class="section-label">Tipo de Ingreso</span>
-                        <select name="unidad_medida" id="unidad_medida" class="form-control" onchange="cambiarModoUnidad()" style="margin-bottom:0;">
-                            <option value="unidad">Por Botella / Unidad</option>
-                            <option value="caja">Por Caja / Pack</option>
+                        <span class="section-label">Modo de Ingreso</span>
+                        <select name="unidad_medida" id="unidad_medida" class="form-control" onchange="calcularTotal()" style="margin-bottom:0;">
+                            <option value="unidad">Por Botella (Unidad)</option>
+                            <option value="caja" id="opt_caja">Por Caja Cerrada</option>
                         </select>
                     </div>
                     
                     <div style="flex:1;">
-                        <span class="section-label" id="lbl_cantidad">Cantidad</span>
-                        <input type="number" name="cantidad" class="form-control" placeholder="0" step="0.01" required style="font-size:1.2rem; font-weight:bold; margin-bottom:0;">
-                    </div>
-
-                    <div style="flex:1; display:none;" id="div_contenido_caja">
-                        <span class="section-label" style="color:var(--royal-gold);">Unid. por Caja</span>
-                        <input type="number" name="unidades_por_caja" id="input_unidades_caja" class="form-control" placeholder="Ej: 12" style="margin-bottom:0;">
+                        <span class="section-label">Cantidad <span id="tag_conversion" class="conversion-tag"></span></span>
+                        <input type="number" name="cantidad" id="input_cantidad" class="form-control" placeholder="0" step="0.01" required style="font-size:1.2rem; font-weight:bold; margin-bottom:0;" oninput="calcularTotal()">
                     </div>
                 </div>
 
                 <div id="div_costo" style="display:none; background:#222; padding:15px; border-radius:10px; border:1px solid #444; margin-bottom:20px;">
                     <div class="input-group-row">
                         <div style="flex:1;">
-                            <span class="section-label" style="color:#fff;" id="lbl_costo_input">Nuevo Costo (Unitario)</span>
+                            <span class="section-label" style="color:#fff;" id="lbl_costo_input">Nuevo Costo</span>
                             <div style="position:relative;">
                                 <span style="position:absolute; left:15px; top:12px; color:#888;">S/</span>
                                 <input type="number" name="costo" id="input_costo" class="form-control" step="0.01" placeholder="0.00" style="padding-left:40px;">
@@ -326,7 +301,7 @@ foreach($productos as $p) {
                             </div>
                         </div>
                     </div>
-                    <small style="color:#666; display:block; margin-top:5px;">* El costo se promediará. El precio de venta se actualizará directamente.</small>
+                    <small style="color:#666; display:block; margin-top:5px;">* El costo se promediará automáticamente.</small>
                 </div>
 
                 <button type="submit" class="btn-royal" id="btn_accion">
@@ -345,6 +320,7 @@ foreach($productos as $p) {
 
 <script>
     const productos = <?= json_encode($prodJson) ?>;
+    let factorActual = 1;
 
     function seleccionarOp(elemento, valor) {
         document.querySelectorAll('.op-card').forEach(c => c.classList.remove('active'));
@@ -386,56 +362,57 @@ foreach($productos as $p) {
         }
     }
 
-    function cambiarModoUnidad() {
-        const modo = document.getElementById('unidad_medida').value;
-        const divCaja = document.getElementById('div_contenido_caja');
-        const inputCaja = document.getElementById('input_unidades_caja');
-        const lblCant = document.getElementById('lbl_cantidad');
-        const lblCosto = document.getElementById('lbl_costo_input');
-
-        if(modo === 'caja') {
-            divCaja.style.display = 'block';
-            inputCaja.required = true;
-            lblCant.innerText = "Cantidad (Cajas)";
-            lblCosto.innerText = "Nuevo Costo (Por Caja)";
-        } else {
-            divCaja.style.display = 'none';
-            inputCaja.required = false;
-            lblCant.innerText = "Cantidad (Botellas/Unid)";
-            lblCosto.innerText = "Nuevo Costo (Unitario)";
-        }
-    }
-
     function actualizarInfo() {
         const id = document.getElementById('producto').value;
         const txtCosto = document.getElementById('txt_costo');
-        const txtVenta = document.getElementById('txt_venta');
-        const infoDiv = document.getElementById('info_costo');
-        const inputCosto = document.getElementById('input_costo');
+        const txtFactor = document.getElementById('txt_factor');
+        const infoDiv = document.getElementById('info_extra');
         const inputVenta = document.getElementById('input_precio_venta');
-        const tipo = document.getElementById('tipo_operacion').value;
+        const optCaja = document.getElementById('opt_caja');
+        const selectMedida = document.getElementById('unidad_medida');
 
         if (id && productos[id]) {
-            const costo = parseFloat(productos[id].costo).toFixed(2);
-            const venta = parseFloat(productos[id].venta).toFixed(2);
+            const data = productos[id];
+            factorActual = parseInt(data.factor) || 1;
             
-            txtCosto.innerText = 'S/ ' + costo;
-            txtVenta.innerText = 'S/ ' + venta;
+            txtCosto.innerText = 'S/ ' + parseFloat(data.costo).toFixed(2);
+            txtFactor.innerText = factorActual + ' Botellas/Caja';
             infoDiv.style.display = 'block';
 
-            // Si es compra, sugerimos el costo actual y precio venta actual
-            if (tipo === 'cargo_compra') {
-                // Si estamos en modo caja, no prellenamos costo unitario para evitar confusión,
-                // o podríamos multiplicar pero mejor dejar que el usuario ingrese la factura.
-                if(document.getElementById('unidad_medida').value === 'unidad') {
-                    inputCosto.value = costo;
-                } else {
-                    inputCosto.value = ''; // Que ingrese costo caja
-                }
-                inputVenta.value = venta;
+            // Configurar opción de caja
+            if(factorActual > 1) {
+                optCaja.disabled = false;
+                optCaja.innerText = `Por Caja (x${factorActual})`;
+            } else {
+                selectMedida.value = 'unidad';
+                optCaja.disabled = true;
+                optCaja.innerText = "Solo por Unidad";
             }
+
+            // Prellenar precio venta
+            if (document.getElementById('tipo_operacion').value === 'cargo_compra') {
+                inputVenta.value = parseFloat(data.venta).toFixed(2);
+            }
+            calcularTotal();
         } else {
             infoDiv.style.display = 'none';
+        }
+    }
+
+    function calcularTotal() {
+        const cantidad = parseFloat(document.getElementById('input_cantidad').value) || 0;
+        const modo = document.getElementById('unidad_medida').value;
+        const tag = document.getElementById('tag_conversion');
+        const lblCosto = document.getElementById('lbl_costo_input');
+
+        if(modo === 'caja' && cantidad > 0) {
+            const totalBotellas = cantidad * factorActual;
+            tag.style.display = 'inline-block';
+            tag.innerText = `= ${totalBotellas} Botellas`;
+            lblCosto.innerText = "Costo Total por Caja";
+        } else {
+            tag.style.display = 'none';
+            lblCosto.innerText = "Costo Unitario";
         }
     }
 </script>

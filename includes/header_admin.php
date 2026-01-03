@@ -76,6 +76,10 @@ if (!isset($_SESSION['user_id'])) {
             <i class="fa-solid fa-store"></i> Gestionar Sedes
         </a>
 
+        <a href="drivers.php">
+            <i class="fa-solid fa-helmet-safety"></i> Drivers & Flota
+        </a>
+
         <a href="usuarios.php">
             <i class="fa-solid fa-users-gear"></i> Usuarios y Permisos
         </a>
@@ -111,6 +115,7 @@ if (!isset($_SESSION['user_id'])) {
     const currentPath = window.location.pathname.split("/").pop();
     document.querySelectorAll('.menu a').forEach(link => {
         const linkPath = link.getAttribute('href');
+        
         // Si el enlace coincide con el archivo actual, lo pintamos de activo
         if(linkPath === currentPath) {
             link.style.background = '#1a1a1a';

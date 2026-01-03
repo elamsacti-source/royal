@@ -6,6 +6,7 @@ session_start();
 if (!isset($_SESSION['user_id'])) { header("Location: ../../index.php"); exit; }
 
 // 2. Verificar Caja Abierta
+// Si NO hay caja abierta, el sistema te expulsa hacia "abrir_caja.php"
 $id_usuario = $_SESSION['user_id'];
 $stmt = $pdo->prepare("SELECT id FROM caja_sesiones WHERE id_usuario = ? AND estado = 'abierta'");
 $stmt->execute([$id_usuario]);
@@ -190,6 +191,11 @@ if (!$caja) { header("Location: abrir_caja.php"); exit; }
                 <h3 style="color:var(--royal-gold); margin:0; font-size:1.2rem;">ROYAL POS</h3>
                 
                 <div style="display:flex; align-items:center;">
+                    
+                    <a href="cerrar_caja.php" class="btn-royal" style="background:#ef5350; color:#fff; padding:4px 10px; border-radius:5px; text-decoration:none; margin-right:10px; font-size:0.9rem;">
+                        <i class="fa-solid fa-calculator"></i> Cerrar Caja
+                    </a>
+
                     <a href="delivery.php" id="btn-delivery-notify">
                         <i class="fa-solid fa-motorcycle"></i> <span id="delivery-count">0</span>
                     </a>
