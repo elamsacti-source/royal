@@ -110,9 +110,15 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
         <i class="ph ph-first-aid-kit" style="color:var(--c-farm); font-size:1.5rem;"></i> Admin Panel
     </div>
     <div style="font-size:0.75rem; color:#64748b; font-weight:700; margin-bottom:10px; text-transform:uppercase;">Menú Principal</div>
+    
     <a href="#" style="color:white; text-decoration:none; display:flex; align-items:center; gap:10px; padding:12px; background:rgba(255,255,255,0.1); border-radius:8px; font-weight:500;">
         <i class="ph ph-package"></i> Inventario Zeth
     </a>
+    
+    <a href="admin_homologar.php" style="color:#94a3b8; text-decoration:none; display:flex; align-items:center; gap:10px; padding:12px; margin-top:5px; transition:0.3s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'">
+        <i class="ph ph-arrows-merge"></i> Homologador Maestro
+    </a>
+
     <a href="intranet.php" style="color:#94a3b8; text-decoration:none; display:flex; align-items:center; gap:10px; padding:12px; margin-top:auto;">
         <i class="ph ph-arrow-u-up-left"></i> Volver
     </a>
@@ -212,20 +218,22 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
 
 <div id="modal-imp" class="modal-overlay">
     <div class="modal-card">
-        <h3>Subir Datos (DBF/CSV)</h3>
+        <h3>Subir Archivos Maestros</h3>
         <form id="form-imp">
-            <label style="font-weight:bold; font-size:0.8rem;">1. Selecciona la Sede:</label>
+            <label style="font-weight:bold; font-size:0.8rem;">1. Selecciona la Sede Destino:</label>
             <select id="imp-sede" style="width:100%;margin-bottom:15px;padding:10px;border-radius:6px;border:1px solid #ccc;">
                 <option value="HUACHO">Huacho</option>
                 <option value="HUAURA">Huaura</option>
                 <option value="MEDIO MUNDO">M. Mundo</option>
             </select>
-            <label style="font-weight:bold; font-size:0.8rem;">2. ¿Qué archivo es?</label>
+            
+            <label style="font-weight:bold; font-size:0.8rem;">2. ¿Qué archivo vas a subir?</label>
             <select id="imp-tipo" style="width:100%;margin-bottom:15px;padding:10px;border-radius:6px;border:1px solid #ccc;">
-                <option value="inventario">Maestro Productos (Zeth70) Inventario </option>
-                <option value="principios">Maestro Principio Activo (Zeth19)</option>
-            </select>
-            <label style="font-weight:bold; font-size:0.8rem;">3. Archivo:</label>
+                <option value="inventario">Maestro Productos (Zeth70)</option>
+                <option value="principios">Maestro Principios (Zeth19)</option>
+                <option value="lineas">Maestro Categorías (Zeth14)</option> <option value="marcas">Maestro Marcas (Zeth15)</option>       </select>
+            
+            <label style="font-weight:bold; font-size:0.8rem;">3. Archivo DBF:</label>
             <input type="file" id="imp-file" accept=".dbf,.DBF,.csv,.CSV,.txt" required style="width:100%;margin-bottom:20px">
             <button class="btn-action btn-imp" style="width:100%;justify-content:center;padding:12px;">Procesar Carga</button>
         </form>
