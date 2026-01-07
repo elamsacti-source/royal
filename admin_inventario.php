@@ -29,8 +29,8 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
     .btn-print { background: #64748b; } .btn-print:hover { background: #475569; }
     .btn-preview { background: #0ea5e9; display: none; }
     .btn-excel { background: #16a34a; } .btn-excel:hover { background: #15803d; }
+    .btn-dbf { background: #475569; } .btn-dbf:hover { background: #334155; }
     
-    /* CARDS */
     .dashboard-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
     .row-sedes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
     .card-sede { padding: 15px 18px; border-radius: 12px; color: white; display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; min-height: 90px; box-shadow: 0 4px 10px -2px rgba(0,0,0,0.15); }
@@ -53,25 +53,12 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
     .cc-num { font-size: 1.1rem; font-weight: 800; color: var(--text); line-height: 1; }
     .cc-money { font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 2px; }
 
-    /* TABLAS OPTIMIZADAS */
     .table-tools { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px 15px; border: 1px solid var(--border); border-radius: 10px 10px 0 0; }
     .table-wrap { background: #fff; border: 1px solid var(--border); border-radius: 0 0 10px 10px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .table-scroll { flex: 1; overflow: auto; }
-    
     table { width: 100%; border-collapse: collapse; min-width: 1000px; } 
-    
-    th { 
-        background: var(--primary); color: white; padding: 10px 8px; 
-        font-size: 0.75rem; text-align: center; cursor: pointer; user-select: none; 
-        border-right: 1px solid rgba(255,255,255,0.1); 
-        white-space: nowrap; 
-    }
-    
-    td { 
-        padding: 8px 8px; 
-        border-bottom: 1px solid var(--border); 
-        font-size: 0.8rem; vertical-align: middle; 
-    }
+    th { background: var(--primary); color: white; padding: 10px 8px; font-size: 0.75rem; text-align: center; cursor: pointer; user-select: none; border-right: 1px solid rgba(255,255,255,0.1); white-space: nowrap; }
+    td { padding: 8px 8px; border-bottom: 1px solid var(--border); font-size: 0.8rem; vertical-align: middle; }
     
     .col-prod { width: 35%; text-align: left; }
     .col-sede { width: 8%; font-size: 0.7rem; text-align: center; color: #64748b; font-weight: 600; }
@@ -86,17 +73,13 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
     .view-section { display: none; flex-direction: column; flex: 1; }
     .view-section.active { display: flex; }
     
-    /* MODAL */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
     .modal-card { background: white; padding: 30px; border-radius: 16px; width: 90%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); display:flex; flex-direction: column; max-height: 90vh;}
-    
     .modal-xl { max-width: 1100px; height: 90vh; }
-    .modal-body-scroll { overflow: auto; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
     .summary-preview { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
     .sp-box { flex: 1; padding: 15px; border-radius: 8px; border: 2px solid #eee; text-align: center; min-width: 150px; }
     .sp-title { font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
     .sp-val { font-size: 1.4rem; font-weight: 800; }
-    .th-sortable { cursor: pointer; user-select: none; padding: 12px !important; background: #f8fafc; position: sticky; top: 0; border-bottom: 2px solid #cbd5e1; font-size: 0.85rem; color: #1e293b; font-weight: 700; }
     .chart-container { background: #fff; padding: 20px; border-radius: 12px; border: 1px solid var(--border); min-height: 350px; }
     .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
     .report-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; flex-direction: column; height: 450px; overflow: hidden; }
@@ -111,14 +94,12 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
     @media print {
         @page { size: A4; margin: 10mm; }
         body { background: white; height: auto; overflow: visible; display: block; }
-        .sidebar, .header, .dashboard-grid, .table-tools, #view-inventory, #view-audit, #view-evolution, #view-report, #pag-controls, #modal-imp, #modal-preview { display: none !important; }
+        .sidebar, .header, .dashboard-grid, .table-tools, #view-inventory, #view-audit, #view-evolution, #view-report, #pag-controls, #modal-imp, #modal-preview, #modal-edit-prod { display: none !important; }
         #printable-area { display: block !important; font-family: 'Arial', sans-serif; color: #000; }
         .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-        .print-header h2 { margin: 0; font-size: 18px; text-transform: uppercase; }
         .print-table { width: 100%; border-collapse: collapse; font-size: 10px; }
         .print-table th { background: #eee !important; color: #000 !important; border: 1px solid #000; padding: 5px; text-align: center; font-weight: bold; }
         .print-table td { border: 1px solid #000; padding: 4px; vertical-align: middle; }
-        .write-box { height: 25px; } 
     }
 </style>
 </head>
@@ -146,45 +127,24 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
             <button class="view-btn" onclick="switchView('report')"><i class="ph ph-file-text"></i> Reporte Auditoría</button>
         </div>
         <div style="display:flex; gap:10px;">
-            <button class="btn-action btn-print" onclick="prepareAndPrint()"><i class="ph ph-printer"></i> Imprimir Hoja</button>
+            <button class="btn-action btn-print" onclick="prepareAndPrint()"><i class="ph ph-printer"></i> Imprimir</button>
             <button id="btn-preview" class="btn-action btn-preview" onclick="showPreviewAudit()"><i class="ph ph-eye"></i> Previsualizar</button>
-            <button id="btn-finalize" class="btn-action btn-fin" onclick="finalizeAudit()"><i class="ph ph-check-circle"></i> Finalizar Auditoría</button>
+            <button id="btn-finalize" class="btn-action btn-fin" onclick="finalizeAudit()"><i class="ph ph-check-circle"></i> Finalizar</button>
             
-            <button class="btn-action btn-excel" onclick="exportToExcel()"><i class="ph ph-file-xls"></i> Exportar Excel</button>
+            <button class="btn-action btn-excel" onclick="exportToExcel()"><i class="ph ph-file-xls"></i> Excel</button>
             
-            <button class="btn-action btn-imp" onclick="openImport()"><i class="ph ph-upload-simple"></i> Importar DBF</button>
+            <button class="btn-action btn-dbf" onclick="exportZeth70()"><i class="ph ph-database"></i> DBF Inventario</button>
+            <button class="btn-action btn-dbf" style="background:#334155;" onclick="exportZeth19()"><i class="ph ph-flask"></i> DBF Principios</button>
+            
+            <button class="btn-action btn-imp" onclick="openImport()"><i class="ph ph-upload-simple"></i> Importar</button>
         </div>
     </div>
 
     <div class="dashboard-grid" id="main-cards">
         <div class="row-sedes">
-            <div class="card-sede cs-huacho">
-                <div class="cs-info">
-                    <div class="cs-title">Huacho</div>
-                    <div class="cs-row"><span class="cs-lbl">Costo:</span> <span class="cs-val" id="vc-huacho">S/ 0.00</span></div>
-                    <div class="cs-row"><span class="cs-lbl">Venta:</span> <span class="cs-val" id="vv-huacho">S/ 0.00</span></div>
-                    <div class="cs-date"><i class="ph ph-clock"></i> <span id="d-huacho">--/--</span></div>
-                </div>
-                <i class="ph ph-map-pin cs-icon"></i>
-            </div>
-            <div class="card-sede cs-huaura">
-                <div class="cs-info">
-                    <div class="cs-title">Huaura</div>
-                    <div class="cs-row"><span class="cs-lbl">Costo:</span> <span class="cs-val" id="vc-huaura">S/ 0.00</span></div>
-                    <div class="cs-row"><span class="cs-lbl">Venta:</span> <span class="cs-val" id="vv-huaura">S/ 0.00</span></div>
-                    <div class="cs-date"><i class="ph ph-clock"></i> <span id="d-huaura">--/--</span></div>
-                </div>
-                <i class="ph ph-hospital cs-icon"></i>
-            </div>
-            <div class="card-sede cs-mm">
-                <div class="cs-info">
-                    <div class="cs-title">Medio Mundo</div>
-                    <div class="cs-row"><span class="cs-lbl">Costo:</span> <span class="cs-val" id="vc-mm">S/ 0.00</span></div>
-                    <div class="cs-row"><span class="cs-lbl">Venta:</span> <span class="cs-val" id="vv-mm">S/ 0.00</span></div>
-                    <div class="cs-date"><i class="ph ph-clock"></i> <span id="d-mm">--/--</span></div>
-                </div>
-                <i class="ph ph-tree-palm cs-icon"></i>
-            </div>
+            <div class="card-sede cs-huacho"><div class="cs-info"><div class="cs-title">Huacho</div><div class="cs-row"><span class="cs-lbl">Costo:</span> <span class="cs-val" id="vc-huacho">S/ 0.00</span></div><div class="cs-row"><span class="cs-lbl">Venta:</span> <span class="cs-val" id="vv-huacho">S/ 0.00</span></div><div class="cs-date"><i class="ph ph-clock"></i> <span id="d-huacho">--/--</span></div></div><i class="ph ph-map-pin cs-icon"></i></div>
+            <div class="card-sede cs-huaura"><div class="cs-info"><div class="cs-title">Huaura</div><div class="cs-row"><span class="cs-lbl">Costo:</span> <span class="cs-val" id="vc-huaura">S/ 0.00</span></div><div class="cs-row"><span class="cs-lbl">Venta:</span> <span class="cs-val" id="vv-huaura">S/ 0.00</span></div><div class="cs-date"><i class="ph ph-clock"></i> <span id="d-huaura">--/--</span></div></div><i class="ph ph-hospital cs-icon"></i></div>
+            <div class="card-sede cs-mm"><div class="cs-info"><div class="cs-title">Medio Mundo</div><div class="cs-row"><span class="cs-lbl">Costo:</span> <span class="cs-val" id="vc-mm">S/ 0.00</span></div><div class="cs-row"><span class="cs-lbl">Venta:</span> <span class="cs-val" id="vv-mm">S/ 0.00</span></div><div class="cs-date"><i class="ph ph-clock"></i> <span id="d-mm">--/--</span></div></div><i class="ph ph-tree-palm cs-icon"></i></div>
         </div>
         <div class="row-cats">
             <div class="card-cat"><div class="cc-icon ico-tot"><i class="ph ph-cube"></i></div><div class="cc-info"><div class="cc-lbl">Total</div><div class="cc-num" id="c-tot">0</div><div class="cc-money" id="m-tot">S/ 0.00</div></div></div>
@@ -232,17 +192,8 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
     </div>
 
     <div id="view-audit" class="view-section">
-        <div class="table-wrap"><div class="table-scroll">
-            <table><thead><tr>
-                <th align="left" onclick="sort('nombre')">Producto <i id="aud-icon-nombre" class="ph ph-caret-up-down"></i></th>
-                <th onclick="sort('sede')">Sede <i id="aud-icon-sede" class="ph ph-caret-up-down"></i></th>
-                <th align="right">Sistema</th>
-                <th style="background:#e0f2fe;color:#0369a1; border-bottom:2px solid #0284c7;">Físico (Real)</th>
-                <th align="center" onclick="sort('diferencia')">Diferencia <i id="aud-icon-diferencia" class="ph ph-caret-up-down"></i></th>
-            </tr></thead><tbody id="tb-audit"></tbody></table>
-        </div></div>
+        <div class="table-wrap"><div class="table-scroll"><table><thead><tr><th align="left" onclick="sort('nombre')">Producto <i id="aud-icon-nombre" class="ph ph-caret-up-down"></i></th><th onclick="sort('sede')">Sede <i id="aud-icon-sede" class="ph ph-caret-up-down"></i></th><th align="right">Sistema</th><th style="background:#e0f2fe;color:#0369a1; border-bottom:2px solid #0284c7;">Físico (Real)</th><th align="center" onclick="sort('diferencia')">Diferencia <i id="aud-icon-diferencia" class="ph ph-caret-up-down"></i></th></tr></thead><tbody id="tb-audit"></tbody></table></div></div>
     </div>
-
     <div id="view-evolution" class="view-section"><div class="chart-container"><h3>Evolución de Valor (S/)</h3><div id="chart-val" style="height:350px;"></div></div></div>
     <div id="view-report" class="view-section">
         <div class="audit-summary-row"><div class="as-card"><div style="font-size:0.8rem;font-weight:700;color:#ef4444">FALTANTE</div><div class="as-val" style="color:#ef4444" id="rep-loss">S/ 0.00</div></div><div class="as-card"><div style="font-size:0.8rem;font-weight:700;color:#22c55e">SOBRANTE</div><div class="as-val" style="color:#22c55e" id="rep-gain">S/ 0.00</div></div><div class="as-card"><div style="font-size:0.8rem;font-weight:700;color:#1e40af">NETO</div><div class="as-val" style="color:#1e40af" id="rep-net">S/ 0.00</div></div></div>
@@ -271,12 +222,36 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
             </select>
             <label style="font-weight:bold; font-size:0.8rem;">2. ¿Qué archivo es?</label>
             <select id="imp-tipo" style="width:100%;margin-bottom:15px;padding:10px;border-radius:6px;border:1px solid #ccc;">
-                <option value="inventario">Inventario (Zeth70)</option>
-                <option value="principios">Maestro Principios (Zeth19)</option>
+                <option value="inventario">Maestro Productos (Zeth70) Inventario </option>
+                <option value="principios">Maestro Principio Activo (Zeth19)</option>
             </select>
             <label style="font-weight:bold; font-size:0.8rem;">3. Archivo:</label>
             <input type="file" id="imp-file" accept=".dbf,.DBF,.csv,.CSV,.txt" required style="width:100%;margin-bottom:20px">
             <button class="btn-action btn-imp" style="width:100%;justify-content:center;padding:12px;">Procesar Carga</button>
+        </form>
+    </div>
+</div>
+
+<div id="modal-edit-prod" class="modal-overlay">
+    <div class="modal-card">
+        <h3>Editar Producto</h3>
+        <form id="form-edit-prod">
+            <input type="hidden" id="ep-id">
+            <label style="font-weight:bold; font-size:0.8rem; display:block; margin-top:10px;">Nombre Producto (Zeth70):</label>
+            <input type="text" id="ep-nombre" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+            <label style="font-weight:bold; font-size:0.8rem; display:block; margin-top:15px;">Principio Activo (Zeth19):</label>
+            <div style="font-size:0.75rem; color:#64748b; margin-bottom:5px;">Busca uno existente o escribe uno nuevo.</div>
+            <input type="text" id="ep-principio" list="list-principios" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" placeholder="Buscar o crear..." autocomplete="off">
+            <datalist id="list-principios"></datalist>
+            <div id="div-new-code" style="display:none; margin-top:10px; background:#eff6ff; padding:10px; border-radius:6px; border:1px solid #bfdbfe;">
+                <label style="font-weight:bold; font-size:0.8rem; color:#1e40af;">¡Es un Principio Nuevo!</label>
+                <div style="font-size:0.75rem; color:#1e40af; margin-bottom:5px;">Ingresa el CÓDIGO (Max 10 chars) para crearlo en Zeth19:</div>
+                <input type="text" id="ep-codigo-prin" maxlength="10" style="width:100%; padding:8px; border:1px solid #93c5fd; border-radius:4px; font-weight:bold;" placeholder="Ej: P0054">
+            </div>
+            <div style="margin-top:20px; display:flex; justify-content:end; gap:10px;">
+                <button type="button" class="btn-action" style="background:#64748b;" onclick="document.getElementById('modal-edit-prod').style.display='none'">Cancelar</button>
+                <button type="submit" class="btn-action btn-excel" style="background:var(--primary);">Guardar Cambios</button>
+            </div>
         </form>
     </div>
 </div>
@@ -286,6 +261,7 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
     let chartInstanceVal = null, chartInstanceAud = null;
     let prevData = { loss: [], gain: [] };
     let prevSort = { loss: { col: 'val', dir: 'desc' }, gain: { col: 'val', dir: 'desc' } };
+    let principiosCache = [];
 
     document.addEventListener('DOMContentLoaded', () => { loadData(); });
 
@@ -328,12 +304,18 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
             d.list.forEach(i=>{ 
                 let margen = 0; let colorMargen = '#64748b';
                 let precio = parseFloat(i.precio || 0); let costo = parseFloat(i.costo || 0);
-                if (precio > 0) {
-                   margen = ((precio - costo) / precio) * 100;
-                   if(margen < 0) colorMargen = '#ef4444'; else if(margen > 20) colorMargen = '#16a34a';
-                }
+                if (precio > 0) { margen = ((precio - costo) / precio) * 100; if(margen < 0) colorMargen = '#ef4444'; else if(margen > 20) colorMargen = '#16a34a'; }
+                
+                const safeName = i.nombre.replace(/'/g, "\\'");
+                const safePrincipio = i.principio ? i.principio.replace(/'/g, "\\'") : '';
+                
                 tbI.innerHTML+=`<tr>
-                    <td class="col-prod"><b>${i.nombre}</b><br><small style="color:#059669">${i.principio}</small><br><small style="color:#94a3b8">${i.codigo}</small></td>
+                    <td class="col-prod">
+                        <div style="display:flex; justify-content:space-between; align-items:start;">
+                            <div><b>${i.nombre}</b><br><small style="color:#059669">${i.principio}</small><br><small style="color:#94a3b8">${i.codigo}</small></div>
+                            <button onclick="editName(${i.id}, '${safeName}', '${safePrincipio}')" style="background:transparent; border:none; cursor:pointer; color:#64748b; padding:2px;"><i class="ph ph-pencil-simple"></i></button>
+                        </div>
+                    </td>
                     <td class="col-sede">${i.sede}</td>
                     <td class="col-cat">${i.categoria}</td>
                     <td class="col-num">${i.stock}</td>
@@ -357,101 +339,107 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
         if (targetEl) { targetEl.className = state.dir === 'ASC' ? 'ph ph-caret-up' : 'ph ph-caret-down'; }
     }
 
-    // Funciones auxiliares
+    // --- EDICIÓN AVANZADA ---
+    async function editName(id, currentName, currentPrincipio) {
+        if(state.sede === 'ALL') { alert("⚠️ Seleccione una SEDE específica (filtro arriba) para editar."); return; }
+        document.getElementById('ep-id').value = id;
+        document.getElementById('ep-nombre').value = currentName;
+        document.getElementById('ep-principio').value = currentPrincipio || '';
+        document.getElementById('ep-codigo-prin').value = ''; 
+        document.getElementById('div-new-code').style.display = 'none';
+        await loadPrincipiosList();
+        document.getElementById('modal-edit-prod').style.display = 'flex';
+    }
+
+    async function loadPrincipiosList() {
+        const res = await fetch(`admin_inventario_backend.php?action=get_principios_list&sede=${state.sede}`);
+        principiosCache = await res.json();
+        const dl = document.getElementById('list-principios'); dl.innerHTML = '';
+        principiosCache.forEach(p => { const opt = document.createElement('option'); opt.value = p.des_sub; dl.appendChild(opt); });
+    }
+
+    document.getElementById('ep-principio').addEventListener('input', function(e) {
+        const val = e.target.value.toUpperCase();
+        const existe = principiosCache.some(p => p.des_sub === val);
+        if (val !== '' && !existe) {
+            document.getElementById('div-new-code').style.display = 'block';
+            document.getElementById('ep-codigo-prin').required = true;
+        } else {
+            document.getElementById('div-new-code').style.display = 'none';
+            document.getElementById('ep-codigo-prin').required = false;
+        }
+    });
+
+    document.getElementById('form-edit-prod').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true; btn.innerHTML = "Guardando...";
+        const body = {
+            action: 'save_advanced_edit',
+            sede: state.sede,
+            id: document.getElementById('ep-id').value,
+            nombre_producto: document.getElementById('ep-nombre').value,
+            nombre_principio: document.getElementById('ep-principio').value,
+            codigo_principio: document.getElementById('ep-codigo-prin').value,
+            principio_borrado: document.getElementById('ep-principio').value === ''
+        };
+        try {
+            const res = await fetch('admin_inventario_backend.php', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            const d = await res.json();
+            if(d.success) { document.getElementById('modal-edit-prod').style.display = 'none'; loadData(); } else { alert("Error: " + d.error); }
+        } catch(err) { alert("Error de conexión"); } finally { btn.disabled = false; btn.innerHTML = "Guardar Cambios"; }
+    });
+
+    // --- EXPORTACIÓN ---
+    function exportZeth70() {
+        if(state.sede === 'ALL') { alert("Seleccione Sede."); return; }
+        window.location.href = `api_exportar_dbf.php?sede=${state.sede}`;
+    }
+
+    function exportZeth19() {
+        if(state.sede === 'ALL') { alert("Seleccione Sede."); return; }
+        if(confirm("¿Descargar maestro de principios actualizado (Zeth19)?")) {
+            window.location.href = `api_exportar_zeth19.php?sede=${state.sede}`;
+        }
+    }
+
+    // --- OTRAS FUNCIONES ---
     async function showPreviewAudit() {
         if(state.sede === 'ALL') { alert("Seleccione una Sede específica en el filtro para auditar."); return; }
         const p = new URLSearchParams({action:'audit_report_data', sede:state.sede});
-        const res = await fetch(`admin_inventario_backend.php?${p}`);
-        const d = await res.json();
+        const res = await fetch(`admin_inventario_backend.php?${p}`); const d = await res.json();
         const fmt = n => 'S/ '+parseFloat(n).toLocaleString('es-PE',{minimumFractionDigits:2});
-        document.getElementById('prev-loss-val').innerText = fmt(d.current_summary.loss);
-        document.getElementById('prev-gain-val').innerText = fmt(d.current_summary.gain);
-        document.getElementById('prev-net-val').innerText = fmt(d.current_summary.net);
-        prevData.loss = d.details_loss.map(x => ({...x, dif_qty: Number(x.dif_qty), dif_val: Number(x.dif_val)}));
-        prevData.gain = d.details_gain.map(x => ({...x, dif_qty: Number(x.dif_qty), dif_val: Number(x.dif_val)}));
-        renderPreviewTable('loss'); renderPreviewTable('gain');
-        document.getElementById('modal-preview').style.display = 'flex';
+        document.getElementById('prev-loss-val').innerText = fmt(d.current_summary.loss); document.getElementById('prev-gain-val').innerText = fmt(d.current_summary.gain); document.getElementById('prev-net-val').innerText = fmt(d.current_summary.net);
+        prevData.loss = d.details_loss.map(x => ({...x, dif_qty: Number(x.dif_qty), dif_val: Number(x.dif_val)})); prevData.gain = d.details_gain.map(x => ({...x, dif_qty: Number(x.dif_qty), dif_val: Number(x.dif_val)}));
+        renderPreviewTable('loss'); renderPreviewTable('gain'); document.getElementById('modal-preview').style.display = 'flex';
     }
 
     function sortPreview(type, col) {
-        const current = prevSort[type];
-        if(current.col === col) current.dir = current.dir === 'asc' ? 'desc' : 'asc'; else { current.col = col; current.dir = col === 'nombre' ? 'asc' : 'desc'; }
+        const current = prevSort[type]; if(current.col === col) current.dir = current.dir === 'asc' ? 'desc' : 'asc'; else { current.col = col; current.dir = col === 'nombre' ? 'asc' : 'desc'; }
         renderPreviewTable(type);
     }
     
     function renderPreviewTable(type) {
-        const list = prevData[type]; const s = prevSort[type];
-        const tbody = document.getElementById(type === 'loss' ? 'prev-tb-loss' : 'prev-tb-gain');
-        const fmt = n => 'S/ '+parseFloat(n).toLocaleString('es-PE',{minimumFractionDigits:2});
-        list.sort((a, b) => {
-            let valA = (s.col === 'nombre') ? a.nombre.toLowerCase() : Math.abs(a['dif_' + s.col]);
-            let valB = (s.col === 'nombre') ? b.nombre.toLowerCase() : Math.abs(b['dif_' + s.col]);
-            if (valA < valB) return s.dir === 'asc' ? -1 : 1;
-            if (valA > valB) return s.dir === 'asc' ? 1 : -1;
-            return 0;
-        });
-        tbody.innerHTML = '';
-        if(list.length === 0) { tbody.innerHTML = '<tr><td colspan="4" align="center" style="padding:10px; color:#999;">Ninguno</td></tr>'; return; }
-        list.forEach((i, index) => {
-            let color = type === 'loss' ? 'red' : 'green'; let sign = type === 'loss' ? '' : '+';
-            tbody.innerHTML += `<tr><td style="color:#94a3b8; font-size:0.75rem;">${index+1}</td><td>${i.nombre}</td><td align="right" style="color:${color};font-weight:bold">${sign}${Math.abs(i.dif_qty)}</td><td align="right" style="color:${color}">${fmt(Math.abs(i.dif_val))}</td></tr>`;
-        });
+        const list = prevData[type]; const s = prevSort[type]; const tbody = document.getElementById(type === 'loss' ? 'prev-tb-loss' : 'prev-tb-gain'); const fmt = n => 'S/ '+parseFloat(n).toLocaleString('es-PE',{minimumFractionDigits:2});
+        list.sort((a, b) => { let valA = (s.col === 'nombre') ? a.nombre.toLowerCase() : Math.abs(a['dif_' + s.col]); let valB = (s.col === 'nombre') ? b.nombre.toLowerCase() : Math.abs(b['dif_' + s.col]); if (valA < valB) return s.dir === 'asc' ? -1 : 1; if (valA > valB) return s.dir === 'asc' ? 1 : -1; return 0; });
+        tbody.innerHTML = ''; if(list.length === 0) { tbody.innerHTML = '<tr><td colspan="4" align="center" style="padding:10px; color:#999;">Ninguno</td></tr>'; return; }
+        list.forEach((i, index) => { let color = type === 'loss' ? 'red' : 'green'; let sign = type === 'loss' ? '' : '+'; tbody.innerHTML += `<tr><td style="color:#94a3b8; font-size:0.75rem;">${index+1}</td><td>${i.nombre}</td><td align="right" style="color:${color};font-weight:bold">${sign}${Math.abs(i.dif_qty)}</td><td align="right" style="color:${color}">${fmt(Math.abs(i.dif_val))}</td></tr>`; });
     }
 
     async function prepareAndPrint() {
-        const btn = document.querySelector('.btn-print'); const oldText = btn.innerHTML;
-        btn.innerHTML = '⏳ Cargando...'; btn.disabled = true;
-        try {
-            const p = new URLSearchParams(state); p.append('no_limit', '1'); p.append('mode', 'inventory'); p.set('sort', 'id'); p.set('dir', 'ASC');
-            const res = await fetch(`admin_inventario_backend.php?${p}`); const d = await res.json();
-            const tbPrint = document.getElementById('tb-print'); tbPrint.innerHTML = '';
-            document.getElementById('print-sede-name').innerText = (state.sede === 'ALL') ? 'Todas las Sedes' : state.sede;
-            d.list.forEach((i, idx) => { tbPrint.innerHTML += `<tr><td style="text-align:center">${idx+1}</td><td><b>${i.nombre}</b><br><span style="font-size:9px;color:#555">COD: ${i.codigo} | ${i.sede}</span></td><td class="write-box"></td><td class="write-box"></td></tr>`; });
-            window.print();
-        } catch(e) { alert("Error al cargar datos."); } finally { btn.innerHTML = oldText; btn.disabled = false; }
+        const btn = document.querySelector('.btn-print'); const oldText = btn.innerHTML; btn.innerHTML = '⏳ Cargando...'; btn.disabled = true;
+        try { const p = new URLSearchParams(state); p.append('no_limit', '1'); p.append('mode', 'inventory'); p.set('sort', 'id'); p.set('dir', 'ASC'); const res = await fetch(`admin_inventario_backend.php?${p}`); const d = await res.json(); const tbPrint = document.getElementById('tb-print'); tbPrint.innerHTML = ''; document.getElementById('print-sede-name').innerText = (state.sede === 'ALL') ? 'Todas las Sedes' : state.sede; d.list.forEach((i, idx) => { tbPrint.innerHTML += `<tr><td style="text-align:center">${idx+1}</td><td><b>${i.nombre}</b><br><span style="font-size:9px;color:#555">COD: ${i.codigo} | ${i.sede}</span></td><td class="write-box"></td><td class="write-box"></td></tr>`; }); window.print(); } catch(e) { alert("Error al cargar datos."); } finally { btn.innerHTML = oldText; btn.disabled = false; }
     }
     
     async function exportToExcel() {
-        const btn = document.querySelector('.btn-excel'); const oldText = btn.innerHTML;
-        btn.innerHTML = '⏳ Generando...'; btn.disabled = true;
-        try {
-            const p = new URLSearchParams(state); p.append('no_limit', '1'); p.append('mode', 'inventory'); p.set('sort', 'id'); p.set('dir', 'ASC'); 
-            const res = await fetch(`admin_inventario_backend.php?${p}`); const d = await res.json();
-            
-            // Construcción del HTML para Excel con soporte de tildes y ñ
-            let table = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><table border="1"><thead><tr><th style="background:#1e40af;color:white;">ID</th><th style="background:#1e40af;color:white;">CÓDIGO</th><th style="background:#1e40af;color:white;">PRODUCTO</th><th style="background:#1e40af;color:white;">PRINCIPIO ACTIVO</th><th style="background:#1e40af;color:white;">SEDE</th><th style="background:#1e40af;color:white;">CATEGORÍA</th><th style="background:#1e40af;color:white;">STOCK</th><th style="background:#1e40af;color:white;">COSTO</th><th style="background:#1e40af;color:white;">PRECIO</th></tr></thead><tbody>`;
-            
-            d.list.forEach((i, index) => { table += `<tr><td>${index + 1}</td><td>${i.codigo}</td><td>${i.nombre}</td><td>${i.principio}</td><td>${i.sede}</td><td>${i.categoria}</td><td>${i.stock}</td><td>${i.costo}</td><td>${i.precio}</td></tr>`; });
-            table += `</tbody></table></body></html>`;
-            
-            // Usamos BOM para forzar UTF-8 en Excel
-            const blob = new Blob(['\ufeff', table], { type: 'application/vnd.ms-excel' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `Inventario_${state.sede}_${new Date().toISOString().slice(0,10)}.xls`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        } catch(e) { alert("Error al exportar."); } finally { btn.innerHTML = oldText; btn.disabled = false; }
+        const btn = document.querySelector('.btn-excel'); const oldText = btn.innerHTML; btn.innerHTML = '⏳ Generando...'; btn.disabled = true;
+        try { const p = new URLSearchParams(state); p.append('no_limit', '1'); p.append('mode', 'inventory'); p.set('sort', 'id'); p.set('dir', 'ASC'); const res = await fetch(`admin_inventario_backend.php?${p}`); const d = await res.json(); let table = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><table border="1"><thead><tr><th style="background:#1e40af;color:white;">ID</th><th style="background:#1e40af;color:white;">CÓDIGO</th><th style="background:#1e40af;color:white;">PRODUCTO</th><th style="background:#1e40af;color:white;">PRINCIPIO ACTIVO</th><th style="background:#1e40af;color:white;">SEDE</th><th style="background:#1e40af;color:white;">CATEGORÍA</th><th style="background:#1e40af;color:white;">STOCK</th><th style="background:#1e40af;color:white;">COSTO</th><th style="background:#1e40af;color:white;">PRECIO</th></tr></thead><tbody>`; d.list.forEach((i, index) => { table += `<tr><td>${index + 1}</td><td>${i.codigo}</td><td>${i.nombre}</td><td>${i.principio}</td><td>${i.sede}</td><td>${i.categoria}</td><td>${i.stock}</td><td>${i.costo}</td><td>${i.precio}</td></tr>`; }); table += `</tbody></table></body></html>`; const blob = new Blob(['\ufeff', table], { type: 'application/vnd.ms-excel' }); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Inventario_${state.sede}_${new Date().toISOString().slice(0,10)}.xls`; document.body.appendChild(a); a.click(); document.body.removeChild(a); } catch(e) { alert("Error al exportar."); } finally { btn.innerHTML = oldText; btn.disabled = false; }
     }
 
     async function saveCount(id, val) { await fetch('admin_inventario_backend.php', { method:'POST', body:JSON.stringify({action:'update_count', id, val}) }); loadData(); }
     async function delItem(id) { if(confirm("¿Eliminar?")) { await fetch('admin_inventario_backend.php', { method:'POST', body:JSON.stringify({action:'delete', id}) }); loadData(); } }
     async function finalizeAudit() { if(confirm("¿Cerrar auditoría oficial?")) { await fetch('admin_inventario_backend.php', { method:'POST', body:JSON.stringify({action:'finalize_audit', sede:state.sede}) }); alert("Finalizado"); document.getElementById('modal-preview').style.display='none'; switchView('report'); } }
-    
-    async function loadReport() {
-        const p = new URLSearchParams({action:'audit_report_data', sede:state.sede}); const res = await fetch(`admin_inventario_backend.php?${p}`); const d = await res.json();
-        const fmt = n => 'S/ '+parseFloat(n).toLocaleString('es-PE',{minimumFractionDigits:2});
-        document.getElementById('rep-loss').innerText = fmt(d.current_summary.loss); document.getElementById('rep-gain').innerText = fmt(d.current_summary.gain); document.getElementById('rep-net').innerText = fmt(d.current_summary.net);
-        const tl=document.getElementById('tb-loss-detail'); tl.innerHTML=''; d.details_loss.forEach(i=>{tl.innerHTML+=`<tr><td>${i.nombre}</td><td style="color:red">${i.dif_qty}</td><td style="color:red">${fmt(i.dif_val)}</td></tr>`});
-        const tg=document.getElementById('tb-gain-detail'); tg.innerHTML=''; d.details_gain.forEach(i=>{tg.innerHTML+=`<tr><td>${i.nombre}</td><td style="color:green">+${i.dif_qty}</td><td style="color:green">${fmt(i.dif_val)}</td></tr>`});
-        if(chartInstanceAud) chartInstanceAud.destroy(); chartInstanceAud = new ApexCharts(document.getElementById('chart-audit'), { series: [{name:'Faltante', data: d.chart_history.map(x=>x.total_faltante)}], chart: {type:'bar', height:250}, xaxis: {categories: d.chart_history.map(x=>x.fecha)}, colors: ['#ef4444'] }); chartInstanceAud.render();
-    }
-    
-    async function loadChartVal() {
-        const res = await fetch('admin_inventario_backend.php?action=history&ts='+new Date().getTime()); const d = await res.json();
-        const series = [{ name: 'Huacho', data: [] }, { name: 'Huaura', data: [] }, { name: 'Medio Mundo', data: [] }];
-        d.forEach(h => { const v = parseFloat(h.total_valor).toFixed(2); if(h.sede=='HUACHO') series[0].data.push({x:h.fecha, y:v}); if(h.sede=='HUAURA') series[1].data.push({x:h.fecha, y:v}); if(h.sede=='MEDIO MUNDO') series[2].data.push({x:h.fecha, y:v}); });
-        if(chartInstanceVal) chartInstanceVal.destroy(); chartInstanceVal = new ApexCharts(document.getElementById('chart-val'), { series: series, chart: {type:'area', height:300}, xaxis: {type:'category'}, colors: ['#0ea5e9', '#8b5cf6', '#10b981'] }); chartInstanceVal.render();
-    }
-
+    async function loadReport() { const p = new URLSearchParams({action:'audit_report_data', sede:state.sede}); const res = await fetch(`admin_inventario_backend.php?${p}`); const d = await res.json(); const fmt = n => 'S/ '+parseFloat(n).toLocaleString('es-PE',{minimumFractionDigits:2}); document.getElementById('rep-loss').innerText = fmt(d.current_summary.loss); document.getElementById('rep-gain').innerText = fmt(d.current_summary.gain); document.getElementById('rep-net').innerText = fmt(d.current_summary.net); const tl=document.getElementById('tb-loss-detail'); tl.innerHTML=''; d.details_loss.forEach(i=>{tl.innerHTML+=`<tr><td>${i.nombre}</td><td style="color:red">${i.dif_qty}</td><td style="color:red">${fmt(i.dif_val)}</td></tr>`}); const tg=document.getElementById('tb-gain-detail'); tg.innerHTML=''; d.details_gain.forEach(i=>{tg.innerHTML+=`<tr><td>${i.nombre}</td><td style="color:green">+${i.dif_qty}</td><td style="color:green">${fmt(i.dif_val)}</td></tr>`}); if(chartInstanceAud) chartInstanceAud.destroy(); chartInstanceAud = new ApexCharts(document.getElementById('chart-audit'), { series: [{name:'Faltante', data: d.chart_history.map(x=>x.total_faltante)}], chart: {type:'bar', height:250}, xaxis: {categories: d.chart_history.map(x=>x.fecha)}, colors: ['#ef4444'] }); chartInstanceAud.render(); }
+    async function loadChartVal() { const res = await fetch('admin_inventario_backend.php?action=history&ts='+new Date().getTime()); const d = await res.json(); const series = [{ name: 'Huacho', data: [] }, { name: 'Huaura', data: [] }, { name: 'Medio Mundo', data: [] }]; d.forEach(h => { const v = parseFloat(h.total_valor).toFixed(2); if(h.sede=='HUACHO') series[0].data.push({x:h.fecha, y:v}); if(h.sede=='HUAURA') series[1].data.push({x:h.fecha, y:v}); if(h.sede=='MEDIO MUNDO') series[2].data.push({x:h.fecha, y:v}); }); if(chartInstanceVal) chartInstanceVal.destroy(); chartInstanceVal = new ApexCharts(document.getElementById('chart-val'), { series: series, chart: {type:'area', height:300}, xaxis: {type:'category'}, colors: ['#0ea5e9', '#8b5cf6', '#10b981'] }); chartInstanceVal.render(); }
     let timer; function debounceSearch(){ clearTimeout(timer); timer=setTimeout(()=>{state.page=1;state.q=document.getElementById('txt-search').value;loadData();},300); }
     function filterCat(c,b){ document.querySelectorAll('.table-tools .view-btn').forEach(btn=>btn.classList.remove('active')); b.classList.add('active'); state.cat=c; state.page=1; loadData(); }
     function filterSede(s){ state.sede=s; state.page=1; loadData(); if(document.getElementById('view-report').classList.contains('active')) loadReport(); }
@@ -462,32 +450,10 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['user_role'] ?? '') !== 'admin') 
     const m=document.getElementById('modal-imp'); function openImport(){m.style.display='flex';} 
     document.getElementById('form-imp').addEventListener('submit',async(e)=>{
         e.preventDefault(); 
-        const btn = e.target.querySelector('button'); 
-        const oldText = btn.innerHTML;
-        btn.innerHTML = "Cargando..."; btn.disabled = true;
-
-        const fd=new FormData(); 
-        fd.append('dbf_file', document.getElementById('imp-file').files[0]); 
-        fd.append('sede_destino', document.getElementById('imp-sede').value);
-        fd.append('tipo_archivo', document.getElementById('imp-tipo').value);
-
-        try {
-            const res = await fetch('api_importar_zeth.php',{method:'POST',body:fd}); 
-            const text = await res.text();
-            try {
-                const d = JSON.parse(text);
-                alert(d.success ? "✅ " + d.message : "⚠️ " + d.message);
-            } catch(jsonErr) {
-                console.error(text);
-                alert("Error del servidor (Ver consola para detalles).");
-            }
-        } catch(err) {
-            alert("Error de conexión.");
-        }
-        
-        m.style.display='none';
-        loadData();
-        btn.innerHTML = oldText; btn.disabled = false;
+        const btn = e.target.querySelector('button'); const oldText = btn.innerHTML; btn.innerHTML = "Cargando..."; btn.disabled = true;
+        const fd=new FormData(); fd.append('dbf_file', document.getElementById('imp-file').files[0]); fd.append('sede_destino', document.getElementById('imp-sede').value); fd.append('tipo_archivo', document.getElementById('imp-tipo').value);
+        try { const res = await fetch('api_importar_zeth.php',{method:'POST',body:fd}); const text = await res.text(); try { const d = JSON.parse(text); alert(d.success ? "✅ " + d.message : "⚠️ " + d.message); } catch(jsonErr) { console.error(text); alert("Error del servidor."); } } catch(err) { alert("Error de conexión."); }
+        m.style.display='none'; loadData(); btn.innerHTML = oldText; btn.disabled = false;
     });
 </script>
 </body>
