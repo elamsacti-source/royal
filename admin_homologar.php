@@ -1,6 +1,9 @@
 <?php
 // admin_homologar.php
-// HOMOLOGADOR SUPREMO: Con visualización de STOCK mejorada
+// V3.1 FINAL: 
+// - Sincronización Inteligente: Actualiza donde hay ID, CREA donde está vacío (incluido M. Mundo).
+// - Cálculo de Ganancia %
+// - Clonado forzoso de Principios Activos.
 
 include_once 'session.php';
 include_once 'db_config.php';
@@ -32,13 +35,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = [];
         while($r = $res->fetch_assoc()) {
             $stockVal = intval($r['stock']);
+            $costo = floatval($r['costo']);
+            $precio = floatval($r['precio']);
+            
+            // Calculo de Ganancia %
+            $ganancia = 0;
+            if ($costo > 0) {
+                $ganancia = round((($precio - $costo) / $costo) * 100, 1);
+            }
+
             $data[] = [
                 'id' => $r['id'],
-                'label' => $r['nombre'], // Texto simple para el input
+                'label' => $r['nombre'], 
                 'value' => $r['nombre'],
                 'nombre_puro' => $r['nombre'],
                 'codigo' => $r['codigo'],
                 'stock' => $stockVal,
+                'ganancia_pct' => $ganancia,
                 
                 'principio_txt' => $r['principio'],
                 'principio_cod' => $r['cod_prin'],
@@ -46,8 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'linea_cod' => $r['cod_lin'],
                 'marca_txt' => $r['marca'],
                 'marca_cod' => $r['cod_mar'],
-                'costo' => $r['costo'],
-                'precio' => $r['precio']
+                'costo' => $costo,
+                'precio' => $precio
             ];
         }
         echo json_encode($data);
@@ -74,48 +87,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode($d); exit;
     }
 
-    // 3. SINCRONIZAR
+    // 3. SINCRONIZAR (UPDATE O CREATE)
     if ($action === 'sync') {
         $nuevoNombre = mb_strtoupper(trim($_POST['nombre']), 'UTF-8');
+        
         $codPrin = $_POST['cod_principio'];
         $nomPrin = mb_strtoupper(trim($_POST['nom_principio']), 'UTF-8');
+        
         $codLin  = $_POST['cod_linea'];
         $codMar  = $_POST['cod_marca'];
+        
         $costo   = floatval($_POST['costo']);
         $precio  = floatval($_POST['precio']);
 
-        // Crear Principio si es nuevo
+        // A. Si el principio no tiene código (es nuevo escrito a mano), generamos uno
         if (empty($codPrin) && !empty($nomPrin)) {
             $r = $conn->query("SELECT MAX(CAST(SUBSTRING(cod_sub, 2) AS UNSIGNED)) as m FROM principios_zeth WHERE cod_sub LIKE 'P%'");
             $next = ($r->fetch_assoc()['m'] ?? 0) + 1;
             $codPrin = 'P' . str_pad($next, 4, '0', STR_PAD_LEFT);
-            $stmtI = $conn->prepare("INSERT INTO principios_zeth (sede, cod_sub, des_sub) VALUES (?,?,?)");
+        }
+
+        // B. CLONADO DE PRINCIPIO: Asegurar que el principio exista en TODAS las sedes
+        if (!empty($codPrin) && !empty($nomPrin)) {
+            $stmtPrin = $conn->prepare("INSERT INTO principios_zeth (sede, cod_sub, des_sub) VALUES (?,?,?) ON DUPLICATE KEY UPDATE des_sub = VALUES(des_sub)");
             foreach(['HUACHO','HUAURA','MEDIO MUNDO'] as $s) {
-                if($conn->query("SELECT id FROM principios_zeth WHERE sede='$s' AND cod_sub='$codPrin'")->num_rows==0){
-                    $stmtI->bind_param("sss", $s, $codPrin, $nomPrin); $stmtI->execute();
-                }
+                $stmtPrin->bind_param("sss", $s, $codPrin, $nomPrin);
+                $stmtPrin->execute();
             }
         }
 
+        // IDs recibidos del formulario
         $ids = [
             'HUAURA' => $_POST['id_huaura'] ?? null,
             'HUACHO' => $_POST['id_huacho'] ?? null,
             'MEDIO MUNDO' => $_POST['id_mmundo'] ?? null
         ];
 
+        // C. PROCESAR PRODUCTOS
         if (!empty($codPrin)) {
-            $sql = "UPDATE inventario_zeth SET nombre=?, sublin=?, lineaz=?, marcaz=?, costo=?, precio=? WHERE id=?";
-            $stmt = $conn->prepare($sql);
             $log = [];
+            
+            $stmtUpd = $conn->prepare("UPDATE inventario_zeth SET nombre=?, sublin=?, lineaz=?, marcaz=?, costo=?, precio=? WHERE id=?");
+            // Insertar con STOCK 0 por defecto
+            $stmtIns = $conn->prepare("INSERT INTO inventario_zeth (codigo, nombre, sublin, lineaz, marcaz, costo, precio, stock, sede) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)");
+
             foreach ($ids as $sede => $id) {
-                if ($id) {
-                    $stmt->bind_param("ssssddi", $nuevoNombre, $codPrin, $codLin, $codMar, $costo, $precio, $id);
-                    if($stmt->execute()) $log[] = $sede;
+                // CASO 1: TIENE ID -> ACTUALIZAR
+                if (!empty($id)) {
+                    $stmtUpd->bind_param("ssssddi", $nuevoNombre, $codPrin, $codLin, $codMar, $costo, $precio, $id);
+                    if($stmtUpd->execute()) $log[] = "$sede (Actualizado)";
+                } 
+                // CASO 2: ESTÁ VACÍO -> CREAR
+                else {
+                    // Generar correlativo propio para esta sede (Busca el último código numérico + 1)
+                    $qMax = $conn->query("SELECT MAX(CAST(codigo AS UNSIGNED)) as max_cod FROM inventario_zeth WHERE sede = '$sede'");
+                    $rMax = $qMax->fetch_assoc();
+                    $nextCodNum = ($rMax['max_cod'] ?? 0) + 1;
+                    $nuevoCodigo = str_pad($nextCodNum, 7, '0', STR_PAD_LEFT); 
+
+                    $stmtIns->bind_param("sssssdds", $nuevoCodigo, $nuevoNombre, $codPrin, $codLin, $codMar, $costo, $precio, $sede);
+                    if($stmtIns->execute()) $log[] = "$sede (Creado: $nuevoCodigo)";
                 }
             }
-            echo json_encode(['success' => true, 'msg' => "Sincronizado: " . implode(', ', $log)]);
+            echo json_encode(['success' => true, 'msg' => "Resultado: " . implode(', ', $log)]);
         } else {
-            echo json_encode(['success' => false, 'msg' => "Falta Principio Activo."]);
+            echo json_encode(['success' => false, 'msg' => "Error: Falta Principio Activo."]);
         }
         exit;
     }
@@ -154,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .cr-cod { font-size:0.7rem; color:#94a3b8; font-weight:bold; }
     .cr-nom { font-weight:700; font-size:0.9rem; color:#0f172a; line-height:1.2; }
     .cr-meta { font-size:0.75rem; color:#475569; margin-top:4px; display:flex; flex-direction:column; gap:2px;}
-    .cr-price { font-size:0.8rem; font-weight:800; color:#334155; margin-top:5px; border-top:1px solid #f1f5f9; padding-top:4px; display:flex; justify-content:space-between;}
+    .cr-price { font-size:0.8rem; font-weight:800; color:#334155; margin-top:5px; border-top:1px solid #f1f5f9; padding-top:4px; display:flex; justify-content:space-between; align-items: center;}
     .btn-close { cursor:pointer; color:red; font-weight:bold; border:none; background:none; font-size:1rem; padding:0; }
     .master-edit { display: none; flex-direction: column; gap: 8px; margin-top: 10px; border-top: 1px solid #bfdbfe; padding-top: 10px; }
     .row-2 { display: flex; gap: 10px; } .col-50 { flex: 1; }
@@ -164,7 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .alert-box { position: fixed; top: 20px; right: 20px; padding: 15px 25px; background: #10b981; color: white; font-weight: bold; border-radius: 8px; display: none; z-index: 10000; }
     .badge-new { background:#f97316; color:white; font-size:0.6rem; padding:1px 4px; border-radius:3px; position:absolute; right:25px; top:35px; display:none;}
     
-    /* ESTILOS LISTA */
+    /* ESTILOS LISTA Y GANANCIA */
     .ui-menu-item-wrapper { display: flex !important; justify-content: space-between; align-items: center; padding: 6px 10px !important; border-bottom: 1px solid #f1f5f9; }
     .prod-info { display:flex; flex-direction:column; }
     .prod-name { font-weight: 700; color: #1e293b; font-size: 0.85rem; }
@@ -172,6 +208,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .prod-stock { font-size: 0.75rem; font-weight: 800; padding: 2px 8px; border-radius: 12px; display: flex; align-items: center; gap: 4px; min-width: 80px; justify-content: center; }
     .stk-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
     .stk-low { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .pill-ganancia { font-size: 0.7rem; background: #e0f2fe; color: #0284c7; padding: 1px 5px; border-radius: 4px; margin-left: 5px; }
+
+    .btn-promote { font-size:0.7rem; background:#475569; color:white; border:none; border-radius:4px; cursor:pointer; padding:4px 8px; margin-top:8px; width:100%; transition: background 0.2s; }
+    .btn-promote:hover { background:#334155; }
 </style>
 </head>
 <body>
@@ -186,43 +226,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="panel p-huaura">
             <div class="p-title">1. Huaura <span class="tag" style="background:#2563eb">MAESTRO</span></div>
             <input type="text" class="inp" id="src_huaura" placeholder="Buscar producto base...">
+            
             <div id="master_panel" class="master-edit">
                 <input type="hidden" id="id_huaura">
                 <label>Nombre Final:</label><input type="text" class="inp inp-master" id="m_nombre">
                 <label>Principio Activo (Z19):</label><input type="text" class="inp inp-master" id="src_prin">
                 <input type="hidden" id="m_prin_cod"><span id="bdg_prin" class="badge-new">NUEVO</span>
                 <div class="row-2">
-                    <div class="col-50"><label>Linea (Categoria):</label><input type="text" class="inp inp-master" id="src_linea"><input type="hidden" id="m_linea_cod"></div>
-                    <div class="col-50"><label>Laboratorio (Sub Categoria):</label><input type="text" class="inp inp-master" id="src_marca"><input type="hidden" id="m_marca_cod"></div>
+                    <div class="col-50"><label>Categoría (Z14):</label><input type="text" class="inp inp-master" id="src_linea"><input type="hidden" id="m_linea_cod"></div>
+                    <div class="col-50"><label>Marca (Z15):</label><input type="text" class="inp inp-master" id="src_marca"><input type="hidden" id="m_marca_cod"></div>
                 </div>
                 <div class="row-2" style="background:#dbeafe; padding:8px; border-radius:6px; margin-top:5px;">
-                    <div class="col-50"><label style="color:#15803d; margin-top:0;">Ul. Costo S/:</label><input type="number" step="0.01" class="inp" id="m_costo" style="font-weight:bold;"></div>
-                    <div class="col-50"><label style="color:#1d4ed8; margin-top:0;">P.V.P S/:</label><input type="number" step="0.01" class="inp" id="m_precio" style="font-weight:bold;"></div>
+                    <div class="col-50"><label style="color:#15803d; margin-top:0;">Costo S/:</label><input type="number" step="0.01" class="inp" id="m_costo" style="font-weight:bold;"></div>
+                    <div class="col-50">
+                        <label style="color:#1d4ed8; margin-top:0;">Venta S/:</label>
+                        <input type="number" step="0.01" class="inp" id="m_precio" style="font-weight:bold;">
+                        <span id="m_ganancia" style="font-size:0.7rem; color:#0284c7; font-weight:bold; display:block; text-align:right; margin-top:2px;">-</span>
+                    </div>
                 </div>
             </div>
         </div>
+
         <div class="panel p-huacho">
             <div class="p-title">2. Huacho <span class="tag" style="background:#10b981">DESTINO</span></div>
             <input type="text" class="inp" id="src_huacho" placeholder="Buscar equivalente...">
             <div id="c_huacho" class="card-res">
                 <div class="cr-head"><span class="cr-cod" id="c_huacho_cod"></span><button class="btn-close" onclick="resetCard('huacho')">×</button></div>
                 <div class="cr-nom" id="c_huacho_nom"></div>
-                <div class="cr-meta"><span>💊Principio Activo: <span id="c_huacho_prin"></span></span><span>📂Categoria: <span id="c_huacho_lin"></span></span><span>🏷️Subcategoria: <span id="c_huacho_mar"></span></span></div>
-                <div class="cr-price"><span>P.Costo: <span id="c_huacho_costo"></span></span><span>P.Venta: <span id="c_huacho_precio"></span></span></div>
+                <div class="cr-meta"><span>💊 <span id="c_huacho_prin"></span></span><span>📂 <span id="c_huacho_lin"></span></span><span>🏷️ <span id="c_huacho_mar"></span></span></div>
+                <div class="cr-price">
+                    <span>C: <span id="c_huacho_costo"></span> | V: <span id="c_huacho_precio"></span></span>
+                    <span id="g_huacho" class="pill-ganancia"></span>
+                </div>
+                <button class="btn-promote" onclick="promoteToMaster('huacho')">⬆ Usar como Base</button>
                 <input type="hidden" id="id_huacho">
+                <input type="hidden" id="data_huacho_full">
             </div>
         </div>
+
         <div class="panel p-mmundo">
             <div class="p-title">3. M. Mundo <span class="tag" style="background:#f59e0b">DESTINO</span></div>
             <input type="text" class="inp" id="src_mm" placeholder="Buscar equivalente...">
             <div id="c_mm" class="card-res">
                 <div class="cr-head"><span class="cr-cod" id="c_mm_cod"></span><button class="btn-close" onclick="resetCard('mm')">×</button></div>
                 <div class="cr-nom" id="c_mm_nom"></div>
-                <div class="cr-meta"><span>💊PrincipioActivo: <span id="c_mm_prin"></span></span><span>📂Categoria: <span id="c_mm_lin"></span></span><span>🏷️Subcategoria: <span id="c_mm_mar"></span></span></div>
-                <div class="cr-price"><span>P.Costo: <span id="c_mm_costo"></span></span><span>P.Venta: <span id="c_mm_precio"></span></span></div>
+                <div class="cr-meta"><span>💊 <span id="c_mm_prin"></span></span><span>📂 <span id="c_mm_lin"></span></span><span>🏷️ <span id="c_mm_mar"></span></span></div>
+                <div class="cr-price">
+                    <span>C: <span id="c_mm_costo"></span> | V: <span id="c_mm_precio"></span></span>
+                    <span id="g_mm" class="pill-ganancia"></span>
+                </div>
+                <button class="btn-promote" onclick="promoteToMaster('mm')">⬆ Usar como Base</button>
                 <input type="hidden" id="id_mm">
+                <input type="hidden" id="data_mm_full">
             </div>
         </div>
+
         <button id="btn_sync" class="btn-sync" onclick="syncAll()" disabled><i class="ph ph-arrows-left-right"></i> SINCRONIZAR TODO</button>
     </div>
 </div>
@@ -232,8 +290,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     function renderProducto(ul, item) {
         let stockClass = item.stock > 0 ? "stk-ok" : "stk-low";
         let stockIcon = item.stock > 0 ? "📦" : "⚠️";
-        return $("<li>").append(`<div><div class="prod-info"><span class="prod-name">${item.nombre_puro}</span><span class="prod-cod">COD: ${item.codigo}</span></div><div class="prod-stock ${stockClass}">${stockIcon} ${item.stock}</div></div>`).appendTo(ul);
+        return $("<li>").append(`<div><div class="prod-info"><span class="prod-name">${item.nombre_puro}</span><span class="prod-cod">COD: ${item.codigo} | 📈 ${item.ganancia_pct}%</span></div><div class="prod-stock ${stockClass}">${stockIcon} ${item.stock}</div></div>`).appendTo(ul);
     };
+
+    // CALCULO GANANCIA MAESTRO
+    function calcGananciaMaster() {
+        let c = parseFloat($("#m_costo").val()) || 0;
+        let v = parseFloat($("#m_precio").val()) || 0;
+        if(c > 0) {
+            let pct = ((v - c) / c * 100).toFixed(1);
+            $("#m_ganancia").text("📈 " + pct + "%");
+        } else { $("#m_ganancia").text("-"); }
+    }
+    $("#m_costo, #m_precio").on('input', calcGananciaMaster);
 
     // 1. MAESTRO HUAURA
     $("#src_huaura").autocomplete({
@@ -244,6 +313,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $("#src_linea").val(ui.item.linea_txt); $("#m_linea_cod").val(ui.item.linea_cod);
             $("#src_marca").val(ui.item.marca_txt); $("#m_marca_cod").val(ui.item.marca_cod);
             $("#m_costo").val(ui.item.costo); $("#m_precio").val(ui.item.precio);
+            
+            calcGananciaMaster();
             checkPrin(); $("#master_panel").css('display','flex'); $("#btn_sync").prop('disabled', false);
             return false;
         }
@@ -258,30 +329,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $("#src_prin").on('input', () => { $("#m_prin_cod").val(''); checkPrin(); });
 
     // 2. DESTINOS
-    function setupDest(sede, inp, card, pfx) {
+    function setupDest(sede, inp, card, pfx, pillId, dataHiddenId) {
         $(inp).autocomplete({
             source: (req, res) => $.post('admin_homologar.php', {action:'search_prod', sede:sede, term:req.term}, res, 'json'),
             select: (e, ui) => {
                 $("#id_"+pfx).val(ui.item.id); $("#c_"+pfx+"_cod").text(ui.item.codigo); $("#c_"+pfx+"_nom").text(ui.item.nombre_puro);
                 $("#c_"+pfx+"_prin").text(ui.item.principio_txt || '-'); $("#c_"+pfx+"_lin").text(ui.item.linea_txt || '-'); $("#c_"+pfx+"_mar").text(ui.item.marca_txt || '-');
                 $("#c_"+pfx+"_costo").text(fmt(ui.item.costo)); $("#c_"+pfx+"_precio").text(fmt(ui.item.precio));
+                
+                $(pillId).text("📈 " + ui.item.ganancia_pct + "%");
+                $(dataHiddenId).val(JSON.stringify(ui.item));
+
                 $(card).show(); $(inp).val(''); return false;
             }
         }).autocomplete("instance")._renderItem = renderProducto;
     }
-    setupDest('HUACHO', '#src_huacho', '#c_huacho', 'huacho');
-    setupDest('MEDIO MUNDO', '#src_mm', '#c_mm', 'mm');
+    setupDest('HUACHO', '#src_huacho', '#c_huacho', 'huacho', '#g_huacho', '#data_huacho_full');
+    setupDest('MEDIO MUNDO', '#src_mm', '#c_mm', 'mm', '#g_mm', '#data_mm_full');
 
     function resetCard(pfx) { $("#id_"+pfx).val(''); $("#c_"+pfx).hide(); }
+    
+    // FUNCION PARA PROMOVER (Inverso)
+    function promoteToMaster(pfx) {
+        let jsonStr = $("#data_"+pfx+"_full").val();
+        if(!jsonStr) return;
+        let item = JSON.parse(jsonStr);
+
+        $("#m_nombre").val(item.nombre_puro);
+        $("#src_prin").val(item.principio_txt); $("#m_prin_cod").val(item.principio_cod);
+        $("#src_linea").val(item.linea_txt); $("#m_linea_cod").val(item.linea_cod);
+        $("#src_marca").val(item.marca_txt); $("#m_marca_cod").val(item.marca_cod);
+        $("#m_costo").val(item.costo); $("#m_precio").val(item.precio);
+        
+        $("#id_huaura").val(''); // Forzar creación en maestro
+        
+        calcGananciaMaster(); checkPrin();
+        $("#master_panel").css('display','flex'); $("#btn_sync").prop('disabled', false);
+        alert("Datos copiados. Pulsa SINCRONIZAR para crear este producto en el Maestro.");
+    }
+
     function syncAll() {
         const d = {
             action: 'sync', nombre: $("#m_nombre").val(), cod_principio: $("#m_prin_cod").val(), nom_principio: $("#src_prin").val(),
             cod_linea: $("#m_linea_cod").val(), cod_marca: $("#m_marca_cod").val(), costo: $("#m_costo").val(), precio: $("#m_precio").val(),
             id_huaura: $("#id_huaura").val(), id_huacho: $("#id_huacho").val(), id_mmundo: $("#id_mm").val()
         };
-        if(!d.id_huaura) return alert("Falta maestro Huaura");
         if(d.nom_principio === '') return alert("Principio obligatorio");
         if(d.costo === '' || d.precio === '') return alert("Precios obligatorios");
+
+        let msg = "¿Sincronizar cambios?";
+        if(!d.id_huaura) msg += "\n✨ SE CREARÁ EN HUAURA";
+        if(!d.id_huacho) msg += "\n✨ SE CREARÁ EN HUACHO";
+        if(!d.id_mmundo) msg += "\n✨ SE CREARÁ EN M. MUNDO";
+
+        if(!confirm(msg)) return;
 
         $("#btn_sync").prop('disabled',true).html('⏳ Procesando...');
         $.post('admin_homologar.php', d, (res) => {
