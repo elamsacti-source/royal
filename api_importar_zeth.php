@@ -1,12 +1,17 @@
 <?php
 // api_importar_zeth.php
-// VERSIÓN FINAL DEFINITIVA: Importador Blindado + Corrección de Ceros + Anti-Duplicados
+// V19.0: Blindado contra duplicados (Duplicate Entry Fix)
+// Si una marca/línea ya existe con otro código, se salta para no romper la carga.
 
 header("Access-Control-Allow-Origin: *");
 header('Content-Type: application/json');
 date_default_timezone_set('America/Lima');
 ini_set('memory_limit', '1024M');
 set_time_limit(600);
+
+// Desactivar reportes de error de mysqli para manejarlos manualmente
+$driver = new mysqli_driver();
+$driver->report_mode = MYSQLI_REPORT_OFF;
 
 include 'db_config.php';
 
@@ -81,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['dbf_file'])) {
         $fileName = $_FILES['dbf_file']['name'];
         $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
-        // BACKUP MAESTRO
+        // BACKUP OPCIONAL
         if ($tipo === 'inventario' && $ext !== 'csv') {
             $backupDir = __DIR__ . '/dbf_backups/';
             if (!file_exists($backupDir)) { mkdir($backupDir, 0777, true); }
@@ -90,9 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['dbf_file'])) {
         }
 
         $dataRows = [];
-        if ($ext === 'csv' || $ext === 'txt') {
-            // Lógica CSV omitida
-        } else {
+        if ($ext !== 'csv' && $ext !== 'txt') {
             $dbf = new NativeDBF($tmpFile);
             $dataRows = $dbf->getRecords();
             $dbf->close();
@@ -100,61 +103,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['dbf_file'])) {
 
         // --- CASO 1: ZETH19 (Principios) ---
         if ($tipo === 'principios') {
-            // Para principios borramos por sede para evitar mezclas, o usamos ON DUPLICATE
             $conn->query("DELETE FROM principios_zeth WHERE sede = '$sede'");
-            $stmt = $conn->prepare("INSERT INTO principios_zeth (sede, cod_sub, des_sub) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE des_sub = VALUES(des_sub)");
-            $total = 0;
+            $stmt = $conn->prepare("INSERT INTO principios_zeth (sede, cod_sub, des_sub) VALUES (?, ?, ?)");
+            $total = 0; $duplicados = 0;
+            
             foreach ($dataRows as $row) {
                 $rowValues = array_values($row);
-                
-                $cod = trim(findVal($row, ['COD_SUB', 'CODIGO']));
-                if ($cod === '' && isset($rowValues[0])) $cod = trim($rowValues[0]);
+                $cod = trim(findVal($row, ['COD_SUB', 'CODIGO'])); if(!$cod && isset($rowValues[0])) $cod=trim($rowValues[0]);
+                $des = trim(findVal($row, ['DES_SUB', 'DESCRIPCION'])); if(!$des && isset($rowValues[1])) $des=trim($rowValues[1]);
 
-                $des = trim(findVal($row, ['DES_SUB', 'DESCRIPCION']));
-                if ($des === '' && isset($rowValues[1])) $des = trim($rowValues[1]);
-
-                if ($cod !== '') { $stmt->bind_param("sss", $sede, $cod, $des); $stmt->execute(); $total++; }
+                if ($cod !== '') { 
+                    $stmt->bind_param("sss", $sede, $cod, $des);
+                    if ($stmt->execute()) {
+                        $total++;
+                    } else {
+                        // Si falla por duplicado (errno 1062), lo ignoramos
+                        if ($conn->errno == 1062) $duplicados++;
+                    }
+                }
             }
-            echo json_encode(['success'=>true, 'message'=>"ZETH19 (Principios): $total registros cargados en $sede."]);
+            echo json_encode(['success'=>true, 'message'=>"ZETH19: $total cargados. $duplicados duplicados ignorados en $sede."]);
         } 
-        // --- CASO 2: ZETH14 (Lineas / Categorias) ---
+        // --- CASO 2: ZETH14 (Lineas) ---
         else if ($tipo === 'lineas') {
             $conn->query("DELETE FROM lineas_zeth WHERE sede = '$sede'");
-            $stmt = $conn->prepare("INSERT INTO lineas_zeth (sede, cod_lin, des_lin) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE des_lin = VALUES(des_lin)");
-            $total = 0;
+            $stmt = $conn->prepare("INSERT INTO lineas_zeth (sede, cod_lin, des_lin) VALUES (?, ?, ?)");
+            $total = 0; $duplicados = 0;
+
             foreach ($dataRows as $row) {
                 $rowValues = array_values($row);
+                $cod = trim(findVal($row, ['COD_LIN', 'CODIGO'])); if(!$cod && isset($rowValues[0])) $cod=trim($rowValues[0]);
+                $des = trim(findVal($row, ['DES_LIN', 'DESCRIPCION'])); if(!$des && isset($rowValues[1])) $des=trim($rowValues[1]);
 
-                $cod = trim(findVal($row, ['COD_LIN', 'CODIGO']));
-                if ($cod === '' && isset($rowValues[0])) $cod = trim($rowValues[0]);
-
-                $des = trim(findVal($row, ['DES_LIN', 'DESCRIPCION']));
-                if ($des === '' && isset($rowValues[1])) $des = trim($rowValues[1]);
-
-                if ($cod !== '') { $stmt->bind_param("sss", $sede, $cod, $des); $stmt->execute(); $total++; }
+                if ($cod !== '') { 
+                    $stmt->bind_param("sss", $sede, $cod, $des);
+                    if ($stmt->execute()) {
+                        $total++;
+                    } else {
+                        if ($conn->errno == 1062) $duplicados++;
+                    }
+                }
             }
-            echo json_encode(['success'=>true, 'message'=>"ZETH14 (Líneas): $total registros cargados en $sede."]);
+            echo json_encode(['success'=>true, 'message'=>"ZETH14: $total cargados. $duplicados duplicados ignorados en $sede."]);
         }
-        // --- CASO 3: ZETH15 (Marcas / Subcategorias) ---
+        // --- CASO 3: ZETH15 (Marcas) ---
         else if ($tipo === 'marcas') {
             $conn->query("DELETE FROM marcas_zeth WHERE sede = '$sede'");
-            $stmt = $conn->prepare("INSERT INTO marcas_zeth (sede, cod_mar, des_mar) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE des_mar = VALUES(des_mar)");
-            $total = 0;
+            $stmt = $conn->prepare("INSERT INTO marcas_zeth (sede, cod_mar, des_mar) VALUES (?, ?, ?)");
+            $total = 0; $duplicados = 0;
+
             foreach ($dataRows as $row) {
                 $rowValues = array_values($row);
+                $cod = trim(findVal($row, ['MAR_PRD', 'COD_MAR', 'CODIGO'])); if(!$cod && isset($rowValues[0])) $cod=trim($rowValues[0]);
+                $des = trim(findVal($row, ['DES_MAR', 'DESCRIPCION'])); if(!$des && isset($rowValues[1])) $des=trim($rowValues[1]);
 
-                $cod = trim(findVal($row, ['MAR_PRD', 'COD_MAR', 'CODIGO']));
-                if ($cod === '' && isset($rowValues[0])) $cod = trim($rowValues[0]);
-
-                $des = trim(findVal($row, ['DES_MAR', 'DESCRIPCION']));
-                if ($des === '' && isset($rowValues[1])) $des = trim($rowValues[1]);
-
-                if ($cod !== '') { $stmt->bind_param("sss", $sede, $cod, $des); $stmt->execute(); $total++; }
+                if ($cod !== '') { 
+                    $stmt->bind_param("sss", $sede, $cod, $des);
+                    // Aquí es donde ocurría el error "Duplicate entry"
+                    if ($stmt->execute()) {
+                        $total++;
+                    } else {
+                        if ($conn->errno == 1062) {
+                            $duplicados++; // Ignoramos silenciosamente el duplicado
+                        } else {
+                            // Si es otro error, lo lanzamos
+                            throw new Exception("Error BD: " . $stmt->error);
+                        }
+                    }
+                }
             }
-            echo json_encode(['success'=>true, 'message'=>"ZETH15 (Marcas): $total registros cargados en $sede."]);
+            echo json_encode(['success'=>true, 'message'=>"ZETH15: $total cargados. $duplicados duplicados ignorados en $sede."]);
         }
         // --- CASO 4: ZETH70 (Inventario) ---
         else {
+            // Inventario generalmente no tiene problemas de índices únicos en descripción
             $stmtCheck = $conn->prepare("SELECT id FROM inventario_zeth WHERE codigo = ? AND sede = ?");
             $stmtUpd = $conn->prepare("UPDATE inventario_zeth SET nombre=?, sublin=?, stock=?, costo=?, precio=?, lineaz=?, marcaz=? WHERE id=?");
             $stmtIns = $conn->prepare("INSERT INTO inventario_zeth (codigo, nombre, sublin, stock, costo, precio, lineaz, marcaz, sede) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -163,34 +185,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['dbf_file'])) {
             foreach ($dataRows as $row) {
                 $rowValues = array_values($row);
 
-                // 1. CÓDIGO
-                $codigo = trim(findVal($row, ['PRONUM', 'CODIGO']));
-                if ($codigo === '' && isset($rowValues[0])) $codigo = trim($rowValues[0]);
-
-                // 2. NOMBRE
-                $nombre = trim(findVal($row, ['DESCRI', 'DESCRIPCION']));
-                if ($nombre === '' && isset($rowValues[1])) $nombre = trim($rowValues[1]);
-
+                $codigo = trim(findVal($row, ['PRONUM', 'CODIGO'])); if(!$codigo && isset($rowValues[0])) $codigo=trim($rowValues[0]);
+                $nombre = trim(findVal($row, ['DESCRI', 'DESCRIPCION'])); if(!$nombre && isset($rowValues[1])) $nombre=trim($rowValues[1]);
                 $sublin = trim(findVal($row, ['SUBLIN'])); 
                 
-                // 3. MARCA (Corrección de Padding)
-                $marcaz = trim(findVal($row, ['MARCAZ', 'MAR_PRD', 'MAR', 'MARCA']));
-                if ($marcaz === '' && isset($rowValues[3])) { $marcaz = trim($rowValues[3]); }
-                // Si es número corto, rellenar con ceros
-                if ($marcaz !== '' && ctype_digit($marcaz) && strlen($marcaz) < 4) {
-                    $marcaz = str_pad($marcaz, 4, '0', STR_PAD_LEFT);
-                }
+                $marcaz = trim(findVal($row, ['MARCAZ', 'MAR_PRD', 'MAR', 'MARCA'])); if(!$marcaz && isset($rowValues[3])) $marcaz=trim($rowValues[3]);
+                if ($marcaz !== '' && ctype_digit($marcaz) && strlen($marcaz) < 4) $marcaz = str_pad($marcaz, 4, '0', STR_PAD_LEFT);
 
-                // 4. LINEA
-                $lineaz = trim(findVal($row, ['LINEAZ', 'COD_LIN', 'LIN', 'LINEA']));
-                if ($lineaz === '' && isset($rowValues[4])) { $lineaz = trim($rowValues[4]); }
+                $lineaz = trim(findVal($row, ['LINEAZ', 'COD_LIN', 'LIN', 'LINEA'])); if(!$lineaz && isset($rowValues[4])) $lineaz=trim($rowValues[4]);
 
                 $stk = floatval(str_replace(',', '', findVal($row, ['TOTSTK', 'STK_ACT', 'STOCK'])));
-                
-                $costoRaw = findVal($row, ['ULCOSREP']); 
-                if (empty($costoRaw)) $costoRaw = findVal($row, ['PRECOS', 'COSTO']);
+                $costoRaw = findVal($row, ['ULCOSREP']); if(empty($costoRaw)) $costoRaw = findVal($row, ['PRECOS', 'COSTO']);
                 $costo = floatval(str_replace(',', '', $costoRaw));
-                
                 $precio = floatval(str_replace(',', '', findVal($row, ['PREVPU', 'PRECIO', 'PVP'])));
 
                 if ($codigo !== '') {
@@ -207,8 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['dbf_file'])) {
                     }
                 }
             }
-            $stmtCheck->close(); $stmtUpd->close(); $stmtIns->close();
-            echo json_encode(['success'=>true, 'message'=>"ZETH70: Inventario actualizado ($act act, $nue nuevos) con Líneas y Marcas calculadas."]);
+            echo json_encode(['success'=>true, 'message'=>"ZETH70: Inventario actualizado ($act act, $nue nuevos) en $sede."]);
         }
 
     } catch (Exception $e) {

@@ -1,98 +1,139 @@
 <?php
 // admin_importar_kardex.php
-// Recibe el archivo ZETH53.DBF subido desde el frontend y lo procesa.
+// V18.0: Corrección de Cruce de Sedes. 
+// Agrega columna 'sede' a la BD y filtra el borrado por sede.
 
+header("Access-Control-Allow-Origin: *");
 header('Content-Type: application/json');
-include 'db_config.php';
+ini_set('display_errors', 0);
+ini_set('memory_limit', '512M');
+set_time_limit(600);
 
-// Verificar extensión dbase
-if (!function_exists('dbase_open')) {
-    echo json_encode(['success' => false, 'message' => 'Error Crítico: La extensión "dbase" de PHP no está activada en este servidor.']);
+$uploadDir = __DIR__ . '/';
+$finalName = 'ZETH53.DBF';
+
+// --- FASE 1: RECEPCIÓN DE TROZOS (Chunk Upload) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file_chunk'])) {
+    $chunk = $_FILES['file_chunk'];
+    $chunkNum = isset($_POST['chunk_index']) ? intval($_POST['chunk_index']) : 0;
+    $tempPath = $uploadDir . $finalName . '.part';
+
+    if ($chunkNum === 0 && file_exists($tempPath)) unlink($tempPath);
+
+    $input = fopen($chunk['tmp_name'], 'rb');
+    $output = fopen($tempPath, 'ab'); 
+    
+    if ($input && $output) {
+        while ($buff = fread($input, 4096)) fwrite($output, $buff);
+        fclose($input);
+        fclose($output);
+        
+        if (isset($_POST['is_last']) && $_POST['is_last'] === 'true') {
+            if (file_exists($uploadDir . $finalName)) unlink($uploadDir . $finalName);
+            rename($tempPath, $uploadDir . $finalName);
+            echo json_encode(['status' => 'done', 'message' => 'Subida completada.']);
+        } else {
+            echo json_encode(['status' => 'ok', 'chunk' => $chunkNum]);
+        }
+    } else {
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => 'Error escribiendo archivo.']);
+    }
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['dbf_file'])) {
-    $file = $_FILES['dbf_file'];
+// --- FASE 2: IMPORTACIÓN A BASE DE DATOS ---
+if (isset($_POST['action']) && $_POST['action'] === 'importar') {
+    include 'db_config.php';
     
-    // Validaciones básicas
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        echo json_encode(['success' => false, 'message' => 'Error al subir el archivo. Código: ' . $file['error']]);
-        exit;
-    }
+    // 1. Recibir la Sede (Obligatorio)
+    $sede = isset($_POST['sede']) ? $conn->real_escape_string($_POST['sede']) : 'HUAURA';
     
-    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if ($ext !== 'dbf') {
-        echo json_encode(['success' => false, 'message' => 'El archivo debe ser un .DBF válido.']);
-        exit;
+    // 2. AUTO-CORRECCIÓN: Crear columna sede si no existe
+    // Esto soluciona el problema de que todos los datos se mezclen
+    $checkCol = $conn->query("SHOW COLUMNS FROM kardex_zeth LIKE 'sede'");
+    if ($checkCol && $checkCol->num_rows == 0) {
+        $conn->query("ALTER TABLE kardex_zeth ADD COLUMN sede VARCHAR(50) DEFAULT 'HUAURA'");
+        $conn->query("CREATE INDEX idx_kardex_sede ON kardex_zeth(sede, codigo_producto)");
     }
 
-    $tmpPath = $file['tmp_name'];
-
-    // 1. Limpiar tabla anterior (Reemplazo total)
-    $conn->query("TRUNCATE TABLE kardex_zeth");
-
-    // 2. Procesar DBF
-    $dbf = @dbase_open($tmpPath, 0);
-    if (!$dbf) {
-        echo json_encode(['success' => false, 'message' => 'No se pudo leer el archivo DBF. Verifica que no esté corrupto.']);
-        exit;
-    }
-
-    $num_registros = dbase_numrecords($dbf);
-    $batch_size = 500;
-    $values = [];
-    $count = 0;
-
-    for ($i = 1; $i <= $num_registros; $i++) {
-        $row = dbase_get_record_with_names($dbf, $i);
-        
-        // Mapeo de campos ZETH53
-        // PRONUM -> codigo_producto
-        // TYPMOV -> tipo_movimiento (CC, DV, etc)
-        // STKSED -> cantidad
-        // DTOMOV -> fecha (YYYYMMDD)
-
-        $codigo = $conn->real_escape_string(trim($row['PRONUM'] ?? ''));
-        $tipo   = $conn->real_escape_string(trim($row['TYPMOV'] ?? ''));
-        $cant   = floatval($row['STKSED'] ?? 0);
-        $fechaRaw  = trim($row['DTOMOV'] ?? '');
-
-        // Formatear Fecha
-        $fecha_fmt = date('Y-m-d'); // Default hoy
-        if (strlen($fechaRaw) === 8) {
-            $fecha_fmt = substr($fechaRaw, 0, 4) . '-' . substr($fechaRaw, 4, 2) . '-' . substr($fechaRaw, 6, 2);
-        }
-
-        if ($codigo !== '') {
-            $values[] = "('$codigo', '$tipo', '$cant', '$fecha_fmt')";
-            $count++;
-        }
-
-        // Insertar en Bloques para velocidad
-        if (count($values) >= $batch_size) {
-            $sql = "INSERT INTO kardex_zeth (codigo_producto, tipo_movimiento, cantidad, fecha_movimiento) VALUES " . implode(',', $values);
-            if (!$conn->query($sql)) {
-                // Si falla un bloque, continuamos con el siguiente (o podrías detener)
+    // 3. Clase Lector DBF Nativo
+    class NativeDBF_Final {
+        private $fp, $header; public $columns = [];
+        public function __construct($file) {
+            if (!file_exists($file)) throw new Exception("El archivo no se encuentra. Error en subida.");
+            $this->fp = fopen($file, 'rb');
+            $buf = fread($this->fp, 32);
+            $this->header = unpack("Vnum_records/vheader_len/vrecord_len", substr($buf, 4, 8));
+            fseek($this->fp, 32);
+            while (ftell($this->fp) < $this->header['header_len'] - 1) {
+                $buf = fread($this->fp, 32);
+                if (ord($buf[0]) == 0x0D) break;
+                $this->columns[] = ['name' => strtoupper(trim(substr($buf, 0, 11))), 'len' => ord($buf[16])];
             }
-            $values = [];
+        }
+        public function getRecordsGenerator() {
+            fseek($this->fp, $this->header['header_len']);
+            while (!feof($this->fp)) {
+                $buf = fread($this->fp, $this->header['record_len']);
+                if (strlen($buf) < $this->header['record_len']) break;
+                if ($buf[0] === '*') continue;
+                $row = []; $pos = 1;
+                foreach ($this->columns as $col) {
+                    $row[$col['name']] = trim(substr($buf, $pos, $col['len']));
+                    $pos += $col['len'];
+                }
+                yield $row;
+            }
         }
     }
 
-    // Insertar restantes
-    if (!empty($values)) {
-        $sql = "INSERT INTO kardex_zeth (codigo_producto, tipo_movimiento, cantidad, fecha_movimiento) VALUES " . implode(',', $values);
-        $conn->query($sql);
+    try {
+        $file = $uploadDir . $finalName;
+        $dbf = new NativeDBF_Final($file);
+        
+        // 4. LIMPIEZA CORRECTA: Borrar SOLO datos de ESTA sede
+        // Así no borramos Huacho cuando subimos Huaura
+        $conn->query("DELETE FROM kardex_zeth WHERE sede = '$sede'");
+        
+        $values = []; 
+        $total = 0; 
+        $batch = 200; 
+        $f_corte = '20250301'; 
+        
+        foreach ($dbf->getRecordsGenerator() as $r) {
+            $fecha = $r['DTOMOV'] ?? '';
+            if ($fecha < $f_corte) continue;
+            
+            $cod = $conn->real_escape_string($r['PRONUM']??'');
+            $tip = $conn->real_escape_string($r['TYPMOV']??'');
+            $cant = floatval($r['STKSED']??0);
+            $f_sql = (strlen($fecha)==8) ? substr($fecha,0,4).'-'.substr($fecha,4,2).'-'.substr($fecha,6,2) : date('Y-m-d');
+            
+            if($cod) {
+                // Insertamos CON la sede
+                $values[] = "('$cod','$tip','$cant','$f_sql','$sede')";
+                $total++;
+            }
+            
+            if (count($values) >= $batch) {
+                $sql = "INSERT INTO kardex_zeth (codigo_producto, tipo_movimiento, cantidad, fecha_movimiento, sede) VALUES " . implode(',', $values);
+                if (!$conn->query($sql)) throw new Exception("Error MySQL: " . $conn->error);
+                $values = [];
+                usleep(50000); 
+            }
+        }
+        
+        if (!empty($values)) {
+            $sql = "INSERT INTO kardex_zeth (codigo_producto, tipo_movimiento, cantidad, fecha_movimiento, sede) VALUES " . implode(',', $values);
+            if (!$conn->query($sql)) throw new Exception("Error MySQL Final: " . $conn->error);
+        }
+        
+        echo json_encode(['success' => true, 'count' => $total, 'message' => "Importados $total registros para la sede $sede."]);
+
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
-
-    dbase_close($dbf);
-
-    echo json_encode([
-        'success' => true, 
-        'message' => "Proceso completado. Se importaron $count movimientos al Kardex."
-    ]);
-    exit;
-} else {
-    echo json_encode(['success' => false, 'message' => 'No se recibió ningún archivo.']);
     exit;
 }
 ?>
