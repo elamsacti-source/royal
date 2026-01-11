@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Citas y Tratamientos - Business Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <header class="bg-blue-800 text-white p-6 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold"><i class="fas fa-user-md mr-2"></i>Dashboard de Gestión Clínica</h1>
+                <p class="text-blue-200 text-sm mt-1">Análisis de Citas, Doctores y Tratamientos</p>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="document.getElementById('fileInput').click()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded shadow transition">
+                    <i class="fas fa-upload mr-2"></i> Cargar SQL
+                </button>
+                <button onclick="exportToExcel()" id="btnExport" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded shadow transition opacity-50 cursor-not-allowed" disabled>
+                    <i class="fas fa-file-excel mr-2"></i> Exportar XLS
+                </button>
+                <input type="file" id="fileInput" accept=".sql" class="hidden" onchange="handleFile(this.files)">
+            </div>
+        </div>
+    </header>
+
+    <div id="dropZone" class="container mx-auto mt-10 p-20 border-4 border-dashed border-gray-300 rounded-lg text-center bg-white shadow-sm hover:bg-gray-50 transition">
+        <i class="fas fa-database text-6xl text-gray-400 mb-4"></i>
+        <h2 class="text-2xl text-gray-600 font-semibold">Sube tu archivo SQL aquí</h2>
+        <p class="text-gray-500">Arrastra el archivo if0_40513845_citas.sql o haz clic en "Cargar SQL"</p>
+    </div>
+
+    <div id="dashboard" class="container mx-auto mt-8 px-4 pb-20 hidden">
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+                <p class="text-gray-500 text-sm font-bold uppercase">Total Citas</p>
+                <h3 class="text-3xl font-bold text-gray-800" id="kpiTotal">0</h3>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+                <p class="text-gray-500 text-sm font-bold uppercase">% Asistencia</p>
+                <h3 class="text-3xl font-bold text-gray-800" id="kpiAsistencia">0%</h3>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-red-500">
+                <p class="text-gray-500 text-sm font-bold uppercase">Cancelaciones</p>
+                <h3 class="text-3xl font-bold text-gray-800" id="kpiCanceladas">0</h3>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+                <p class="text-gray-500 text-sm font-bold uppercase">Adherencia Tratamientos</p>
+                <h3 class="text-3xl font-bold text-gray-800" id="kpiTratamientos">0%</h3>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h4 class="text-lg font-bold text-gray-700 mb-4">Citas por Día de la Semana</h4>
+                <canvas id="chartDias"></canvas>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h4 class="text-lg font-bold text-gray-700 mb-4">Top 5 Doctores (Volumen)</h4>
+                <canvas id="chartDoctores"></canvas>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h4 class="text-lg font-bold text-gray-700 mb-4">Estado de Tratamientos</h4>
+                <div class="h-64 flex justify-center">
+                    <canvas id="chartTratamientos"></canvas>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow overflow-auto">
+                <h4 class="text-lg font-bold text-gray-700 mb-4">Resumen Semanal</h4>
+                <table class="min-w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3">Semana</th>
+                            <th class="px-6 py-3">Total Citas</th>
+                            <th class="px-6 py-3">Atendidos</th>
+                            <th class="px-6 py-3">% Efe.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaSemanalCuerpo">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="p-6 border-b">
+                <h4 class="text-lg font-bold text-gray-700">Detalle de Gestión Médica</h4>
+            </div>
+            <div class="overflow-x-auto max-h-96">
+                <table class="min-w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="px-6 py-3">Fecha</th>
+                            <th class="px-6 py-3">Día</th>
+                            <th class="px-6 py-3">Doctor</th>
+                            <th class="px-6 py-3">Especialidad</th>
+                            <th class="px-6 py-3">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaDetalleCuerpo">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Variables Globales para almacenar la data procesada
+        let DB = {
+            citas: [],
+            doctores: {}, // id -> nombre
+            especialidades: {}, // id -> nombre
+            tratamientos: []
+        };
+        let globalExcelData = [];
+
+        // 1. Manejo de Archivos
+        function handleFile(files) {
+            const file = files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                parseSQL(content);
+            };
+            reader.readAsText(file);
+        }
+
+        // 2. Parser SQL (Lógica personalizada para leer el archivo subido)
+        function parseSQL(sqlContent) {
+            // Limpiar indicadores visuales
+            document.getElementById('dropZone').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+
+            const lines = sqlContent.split('\n');
+            
+            // Expresiones regulares simples para capturar INSERTs de las tablas clave
+            // Nota: Esto asume la estructura estándar de phpMyAdmin
+            
+            lines.forEach(line => {
+                if (line.startsWith('INSERT INTO `doctores`')) {
+                    extractValues(line, 'doctores');
+                } else if (line.startsWith('INSERT INTO `especialidades`')) {
+                    extractValues(line, 'especialidades');
+                } else if (line.startsWith('INSERT INTO `citas`')) {
+                    extractValues(line, 'citas');
+                } else if (line.startsWith('INSERT INTO `tratamiento_cronograma`')) {
+                    extractValues(line, 'tratamiento_cronograma');
+                }
+            });
+
+            processAndRender();
+        }
+
+        function extractValues(line, tableName) {
+            // Extraer lo que está después de VALUES
+            const valuesPart = line.substring(line.indexOf('VALUES') + 6).trim();
+            // Remover el punto y coma final
+            const cleanValues = valuesPart.replace(/;$/, '');
+            
+            // Regex básico para separar tuplas (1, 'x', 'y'), (2, ...)
+            // Advertencia: Esto es un parser simplificado.
+            const regex = /\(([^)]+)\)/g;
+            let match;
+
+            while ((match = regex.exec(cleanValues)) !== null) {
+                // Separar por comas, cuidando comillas simples es complejo, 
+                // pero para este caso simplificado usaremos split y limpieza.
+                // Una solución robusta requeriría un parser CSV completo sobre el string.
+                let rawData = match[1].split(/,(?=(?:(?:[^']*'){2})*[^']*$)/); 
+                let data = rawData.map(d => d.trim().replace(/^'|'$/g, '')); // Quitar comillas
+
+                if (tableName === 'doctores') {
+                    // id (0), nombres (1), apellidos (2)
+                    DB.doctores[data[0]] = `${data[1]} ${data[2]}`;
+                } else if (tableName === 'especialidades') {
+                    // id (0), nombre (1)
+                    DB.especialidades[data[0]] = data[1];
+                } else if (tableName === 'citas') {
+                    // id, paciente_id, doctor_id, especialidad_id, fecha, hora, estado...
+                    // Ajustar índices según tu estructura real. 
+                    // Basado en archivos previos: id(0), pac(1), doc(2), esp(3), fecha(5), hora(6), estado(8/9 aprox)
+                    // Vamos a intentar detectar columnas dinámicamente o usar índices comunes.
+                    // ASUMIENDO ESTRUCTURA COMUN: ID, PAC, DOC, ESP, USER, FECHA, HORA, ..., ESTADO
+                    
+                    // Ajuste manual basado en la data típica
+                    DB.citas.push({
+                        id: data[0],
+                        doctor_id: data[2],
+                        especialidad_id: data[3],
+                        fecha: data[5],
+                        estado: data.find(item => item === 'PENDIENTE' || item === 'ATENDIDO' || item === 'CANCELADO' || item === 'NO ASISTIO') || 'DESCONOCIDO'
+                    });
+                } else if (tableName === 'tratamiento_cronograma') {
+                    // Buscar status como REALIZADO, PENDIENTE
+                    let estado = data.find(item => item === 'REALIZADO' || item === 'PENDIENTE' || item === 'CANCELADO');
+                    if(estado) DB.tratamientos.push({ estado: estado });
+                }
+            }
+        }
+
+        // 3. Lógica de Negocio y Visualización
+        function processAndRender() {
+            // --- A. Preparar Datos ---
+            let totalCitas = DB.citas.length;
+            let atendidos = 0;
+            let cancelados = 0;
+            
+            let citasPorDia = {'Lunes':0, 'Martes':0, 'Miércoles':0, 'Jueves':0, 'Viernes':0, 'Sábado':0, 'Domingo':0};
+            let citasPorDoc = {};
+            let citasPorSemana = {};
+
+            // Mapeo auxiliar para días
+            const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+            DB.citas.forEach(c => {
+                // Contadores Globales
+                if(c.estado === 'ATENDIDO') atendidos++;
+                if(c.estado === 'CANCELADO' || c.estado === 'NO ASISTIO') cancelados++;
+
+                // Por Doctor
+                let docName = DB.doctores[c.doctor_id] || 'Desconocido';
+                if(!citasPorDoc[docName]) citasPorDoc[docName] = 0;
+                citasPorDoc[docName]++;
+
+                // Por Día y Semana
+                if(c.fecha && c.fecha.length >= 10) {
+                    let d = new Date(c.fecha);
+                    let diaNombre = diasSemana[d.getDay()];
+                    if(citasPorDia[diaNombre] !== undefined) citasPorDia[diaNombre]++;
+                    
+                    // Semana (Simulada)
+                    let firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+                    let pastDaysOfYear = (d - firstDayOfYear) / 86400000;
+                    let numSemana = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+                    let keySemana = `Sem ${numSemana} - ${d.getFullYear()}`;
+                    
+                    if(!citasPorSemana[keySemana]) citasPorSemana[keySemana] = {total:0, atendidos:0};
+                    citasPorSemana[keySemana].total++;
+                    if(c.estado === 'ATENDIDO') citasPorSemana[keySemana].atendidos++;
+                }
+            });
+
+            // Tratamientos
+            let tratTotal = DB.tratamientos.length;
+            let tratRealizados = DB.tratamientos.filter(t => t.estado === 'REALIZADO').length;
+
+            // --- B. Actualizar DOM (KPIs) ---
+            document.getElementById('kpiTotal').innerText = totalCitas;
+            document.getElementById('kpiAsistencia').innerText = totalCitas > 0 ? ((atendidos/totalCitas)*100).toFixed(1) + '%' : '0%';
+            document.getElementById('kpiCanceladas').innerText = cancelados;
+            document.getElementById('kpiTratamientos').innerText = tratTotal > 0 ? ((tratRealizados/tratTotal)*100).toFixed(1) + '%' : '0%';
+
+            // Habilitar botón exportar
+            const btnExport = document.getElementById('btnExport');
+            btnExport.disabled = false;
+            btnExport.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            // --- C. Gráficos Chart.js ---
+            
+            // 1. Días
+            new Chart(document.getElementById('chartDias'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(citasPorDia),
+                    datasets: [{
+                        label: 'Cantidad de Citas',
+                        data: Object.values(citasPorDia),
+                        backgroundColor: '#3B82F6'
+                    }]
+                }
+            });
+
+            // 2. Doctores (Top 5)
+            // Ordenar doctores
+            let docsSorted = Object.entries(citasPorDoc).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            new Chart(document.getElementById('chartDoctores'), {
+                type: 'doughnut',
+                data: {
+                    labels: docsSorted.map(d => d[0]),
+                    datasets: [{
+                        data: docsSorted.map(d => d[1]),
+                        backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6']
+                    }]
+                }
+            });
+
+            // 3. Tratamientos
+            new Chart(document.getElementById('chartTratamientos'), {
+                type: 'pie',
+                data: {
+                    labels: ['Realizados', 'Pendientes/Otros'],
+                    datasets: [{
+                        data: [tratRealizados, tratTotal - tratRealizados],
+                        backgroundColor: ['#10B981', '#E5E7EB']
+                    }]
+                }
+            });
+
+            // --- D. Llenar Tablas ---
+            
+            // Tabla Semanal
+            const tbodySem = document.getElementById('tablaSemanalCuerpo');
+            tbodySem.innerHTML = '';
+            Object.keys(citasPorSemana).sort().forEach(sem => {
+                let data = citasPorSemana[sem];
+                let pct = data.total > 0 ? ((data.atendidos/data.total)*100).toFixed(0) + '%' : '0%';
+                let row = `<tr class="bg-white border-b"><td class="px-6 py-4 font-medium text-gray-900">${sem}</td><td class="px-6 py-4">${data.total}</td><td class="px-6 py-4 text-green-600">${data.atendidos}</td><td class="px-6 py-4">${pct}</td></tr>`;
+                tbodySem.innerHTML += row;
+            });
+
+            // Tabla Detalle y Preparación para Excel
+            const tbodyDet = document.getElementById('tablaDetalleCuerpo');
+            tbodyDet.innerHTML = '';
+            
+            // Limitamos visualización a 100 filas para no saturar el DOM, pero Excel tendrá todo
+            DB.citas.forEach((c, index) => {
+                let docName = DB.doctores[c.doctor_id] || 'Desconocido';
+                let espName = DB.especialidades[c.especialidad_id] || '-';
+                
+                // Objeto para Excel
+                let d = new Date(c.fecha);
+                let diaSem = diasSemana[d.getDay()];
+                
+                globalExcelData.push({
+                    'Fecha': c.fecha,
+                    'Día Semana': diaSem,
+                    'Semana': `S${Math.ceil((((d - new Date(d.getFullYear(),0,1)) / 86400000) + new Date(d.getFullYear(),0,1).getDay()+1) / 7)}`,
+                    'Doctor': docName,
+                    'Especialidad': espName,
+                    'Estado Cita': c.estado
+                });
+
+                if(index < 50) { // Solo mostrar primeros 50 en pantalla
+                    let row = `<tr class="bg-white border-b hover:bg-gray-50">
+                        <td class="px-6 py-4">${c.fecha}</td>
+                        <td class="px-6 py-4">${diaSem}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">${docName}</td>
+                        <td class="px-6 py-4 text-xs">${espName}</td>
+                        <td class="px-6 py-4">
+                            <span class="${c.estado === 'ATENDIDO' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-xs font-medium px-2.5 py-0.5 rounded">
+                                ${c.estado}
+                            </span>
+                        </td>
+                    </tr>`;
+                    tbodyDet.innerHTML += row;
+                }
+            });
+        }
+
+        // 4. Exportar a Excel
+        function exportToExcel() {
+            // Hoja 1: Data Maestra
+            const ws = XLSX.utils.json_to_sheet(globalExcelData);
+            
+            // Hoja 2: Resumen Doctores
+            // Calcular resumen al vuelo
+            let resumenDocs = {};
+            globalExcelData.forEach(row => {
+                if(!resumenDocs[row.Doctor]) resumenDocs[row.Doctor] = {Citas:0, Atendidos:0};
+                resumenDocs[row.Doctor].Citas++;
+                if(row['Estado Cita'] === 'ATENDIDO') resumenDocs[row.Doctor].Atendidos++;
+            });
+            let resumenArray = Object.keys(resumenDocs).map(doc => ({
+                Doctor: doc,
+                Total_Citas: resumenDocs[doc].Citas,
+                Atendidos: resumenDocs[doc].Atendidos,
+                Efectividad: (resumenDocs[doc].Atendidos / resumenDocs[doc].Citas)
+            }));
+            const ws2 = XLSX.utils.json_to_sheet(resumenArray);
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data Detallada");
+            XLSX.utils.book_append_sheet(wb, ws2, "Resumen Doctores");
+
+            XLSX.writeFile(wb, "Reporte_Clinica_Mensual.xlsx");
+        }
+    </script>
+</body>
+</html>
